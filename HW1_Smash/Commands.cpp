@@ -79,8 +79,8 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() {
-// TODO: add your implementation
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr){
+
 }
 
 SmallShell::~SmallShell() {
@@ -92,9 +92,11 @@ SmallShell::~SmallShell() {
 */
 Command * SmallShell::CreateCommand(const char* cmd_line) {
 	// For example:
-/*
+
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+
+  SmallShell& smash = SmallShell::getInstance();
 
   if (firstWord.compare("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
@@ -102,12 +104,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else if (firstWord.compare("showpid") == 0) {
     return new ShowPidCommand(cmd_line);
   }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
+  else if (firstWord.compare("chprompt") == 0){
+      return new ChangePromptCommand(cmd_s);
   }
-  */
+  else if (firstWord.compare("cd") == 0){
+//      string lastPwd = smash.getLastPwd();
+//      std::vector<char> cstr(lastPwd.c_str(), lastPwd.c_str() + lastPwd.size() + 1);
+      return new ChangeDirCommand(cmd_s.c_str(), smash.getLastPwd());
+  }
+//  .....
+  else {
+//    return new ExternalCommand(cmd_line);
+  }
+
   return nullptr;
 }
 

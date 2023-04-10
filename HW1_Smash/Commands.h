@@ -2,19 +2,23 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <string>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 
 class Command {
-// TODO: Add your data members
- public:
-  Command(const char* cmd_line);
-  virtual ~Command();
-  virtual void execute() = 0;
+    const char* cmd_line;
+public:
+    Command(const char* cmd_line);
+    virtual ~Command() = default;
+    virtual void execute() = 0;
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
+    const char *getCmdLine() const;
+
+    void setCmdLine(const char *cmdLine);
 };
 
 class BuiltInCommand : public Command {
@@ -46,6 +50,15 @@ class RedirectionCommand : public Command {
   void execute() override;
   //void prepare() override;
   //void cleanup() override;
+};
+
+class ChangePromptCommand : public BuiltInCommand {
+private:
+    std::string secondWord;
+public:
+    ChangePromptCommand(std::string cmd_s);
+    virtual ~ChangePromptCommand() = default;
+    void execute() override;
 };
 
 class ChangeDirCommand : public BuiltInCommand {
@@ -180,7 +193,7 @@ public:
   static SmallShell& getInstance() // make SmallShell singleton
   {
     static SmallShell instance; // Guaranteed to be destroyed.
-    // Instantiated on first use.
+
     return instance;
   }
   ~SmallShell();
