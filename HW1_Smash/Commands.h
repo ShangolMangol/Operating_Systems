@@ -50,9 +50,11 @@ class RedirectionCommand : public Command {
 
 class ChangeDirCommand : public BuiltInCommand {
 // TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
-  virtual ~ChangeDirCommand() {}
-  void execute() override;
+public:
+    char** lastPwd;
+    ChangeDirCommand(const char* cmd_line, char** plastPwd);
+    virtual ~ChangeDirCommand() {}
+    void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
@@ -168,7 +170,10 @@ class SmallShell {
  private:
   // TODO: Add your data members
   SmallShell();
- public:
+  std::string promptStr;
+  char** lastPwd;
+
+public:
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
@@ -180,6 +185,14 @@ class SmallShell {
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
+
+  std::string getPromptStr();
+  void setPromptStr(const std::string newPromptStr);
+
+  char** getLastPwd() const;
+
+  void setLastPwd(char** lastPwd);
+
   // TODO: add extra methods as needed
 };
 

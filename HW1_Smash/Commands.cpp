@@ -77,7 +77,7 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
 SmallShell::SmallShell() {
 // TODO: add your implementation
@@ -114,7 +114,101 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
   // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
+   Command* cmd = CreateCommand(cmd_line);
+   cmd->execute();
+   delete cmd;
   // Please note that you must fork smash process for some commands (e.g., external commands....)
+}
+
+string SmallShell::getPromptStr(){
+    return this->promptStr;
+}
+
+void SmallShell::setPromptStr(const std::string newPromptStr){
+    this->promptStr = newPromptStr;
+}
+
+char** SmallShell::getLastPwd() const {
+    return lastPwd;
+}
+
+void SmallShell::setLastPwd(char** lastPwd) {
+    SmallShell::lastPwd = lastPwd;
+}
+
+ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
+{
+    string command = "chprompt";
+    if(cmd_s.length() >= command.length()+1)
+        this->secondWord = cmd_s.substr(command.length()+1, cmd_s.find_first_of(" \n"));
+    else
+        this->secondWord = "";
+}
+
+void ChangePromptCommand::execute()
+{
+    SmallShell& smash = SmallShell::getInstance();
+    secondWord = _trim(secondWord);
+    if(secondWord.length() == 0){
+        smash.setPromptStr("smash");
+    }
+    else{
+        smash.setPromptStr(secondWord);
+    }
+}
+
+BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
+
+}
+
+Command::Command(const char *cmd_line) : cmd_line(cmd_line){
+
+}
+
+const char *Command::getCmdLine() const {
+    return cmd_line;
+}
+
+void Command::setCmdLine(const char *cmdLine) {
+    cmd_line = cmdLine;
+}
+
+ShowPidCommand::ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line){}
+
+void ShowPidCommand::execute(){
+    cout << "smash pid is " << getpid() << "\n";
+}
+
+GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+}
+
+void GetCurrDirCommand::execute() {
+    char cwd[256];
+    if(getcwd(cwd, sizeof(cwd)) == NULL)
+        perror("smash error: getcwd failed");
+    else
+        cout << cwd << "\n";
+}
+
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd)
+    : BuiltInCommand(cmd_line), lastPwd(plastPwd)
+{
+
+}
+
+void ChangeDirCommand::execute() {
+    char *args[25];
+    for (int i = 0; i < 25; i++) {
+        args[i] = NULL;
+    }
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if (argNum > 2 ){
+        cerr << "smash error: cd: too many arguments";
+    }
+    else if(argNum < 2) {
+        cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
+    }
+    else if (args[1]== "-"){
+        }
+
 }
