@@ -110,7 +110,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else if (firstWord.compare("cd") == 0){
 //      string lastPwd = smash.getLastPwd();
 //      std::vector<char> cstr(lastPwd.c_str(), lastPwd.c_str() + lastPwd.size() + 1);
-      return new ChangeDirCommand(cmd_s.c_str(), smash.getLastPwd());
+      return new ChangeDirCommand(cmd_line, smash.getLastPwd());
   }
 //  .....
   else {
@@ -217,7 +217,29 @@ void ChangeDirCommand::execute() {
     else if(argNum < 2) {
         cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
     }
-    else if (args[1]== "-"){
+    else
+    {
+        string path = args[1];
+
+        char* cwd = new char[256];
+        if(getcwd(cwd, sizeof(char)*256) == NULL) {
+            perror("smash error: getcwd failed");
+            return;
         }
+        if(path.compare("-") == 0)
+        {
+            if(lastPwd == nullptr)
+                cerr << "smash error: cd: OLDPWD not set";
+            else
+                path = *lastPwd;
+        }
+
+        //executing cd
+        if (chdir(path.c_str())!=0){
+            perror("smash error: chdir failed");
+        }
+        delete[] this->lastPwd;
+        *(this->lastPwd) = cwd;
+    }
 
 }
