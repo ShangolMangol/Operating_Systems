@@ -327,7 +327,23 @@ JobsList::JobEntry *JobsList::getJobById(int jobId) {
 }
 
 void JobsList::removeJobById(int jobId) {
-    erase(this->getJobById(jobId));
+
+    for(auto job = jobsVec.begin(); job< jobsVec.end(); job++)
+    {
+        if((*job)->jobId == jobId) {
+            jobsVec.erase(job);
+        }
+    }
+
+    int maxJobId = 1;
+    for(JobEntry* jobEntry : jobsVec)
+    {
+        if(jobEntry->jobId >= maxJobId)
+        {
+            maxJobId = jobEntry->jobId + 1;
+        }
+    }
+    this->maxJobIdAvailable = maxJobId;
 }
 
 JobsList::JobEntry::JobEntry(int job, std::string command, int pid, bool isStopped)
