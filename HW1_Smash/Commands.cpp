@@ -6,6 +6,7 @@
 #include <sys/wait.h>
 #include <iomanip>
 #include "Commands.h"
+#include <algorithm>
 
 using namespace std;
 
@@ -108,8 +109,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
       return new ChangePromptCommand(cmd_s);
   }
   else if (firstWord.compare("cd") == 0){
-//      string lastPwd = smash.getLastPwd();
-//      std::vector<char> cstr(lastPwd.c_str(), lastPwd.c_str() + lastPwd.size() + 1);
       return new ChangeDirCommand(cmd_line, smash.getLastPwd());
   }
   else if (firstWord.compare("cd") == 0)
@@ -214,7 +213,7 @@ void GetCurrDirCommand::execute() {
 }
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd)
-    : BuiltInCommand(cmd_line), lastPwd(plastPwd)
+    : BuiltInCommand(cmd_line), dirLastPwd(plastPwd)
 {
 
 }
@@ -260,4 +259,90 @@ void ChangeDirCommand::execute() {
         if(args[i] != NULL)
             free(args[i]);
     }
+}
+
+JobsList::JobsList(): maxJobIdAvailable(1) {}
+
+JobsList::~JobsList(){
+    killAllJobs();
+}
+void JobsList::addJob(Command* cmd, bool isStopped){
+    JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
+                                   cmd->getCommandType(), getpid(), isStopped);
+    maxJobIdAvailable++;
+    jobsVec.push_back(newJob);
+}
+
+bool compareJobs(JobsList::JobEntry *job1, JobsList::JobEntry *job2) {
+    return job1->jobId < job2->jobId;
+}
+
+void JobsList::printJobsList() {
+    std::sort(jobsVec.begin(), jobsVec.end(), compareJobs);
+    for (JobEntry* job : jobsVec) {
+        cout << "[" << job->jobId << "]" << job->command << " : " << job->processId
+             << job->calculateTimeElapsed() << " secs";
+        if(job->isStopped)
+            cout << " (stopped)";
+        cout << "\n";
+    }
+}
+
+void JobsList::killAllJobs() {
+    for (JobEntry* jobEntry : jobsVec)
+    {
+        delete jobEntry;
+    }
+    jobsVec.clear();
+    maxJobIdAvailable = 1;
+}
+
+void JobsList::removeFinishedJobs()
+{
+    vector<int> jobsToDelete;
+    int childPid = waitpid(-1, NULL, WNOHANG);
+    while(childPid > 0)
+    {
+        jobsToDelete.push_back(childPid);
+        childPid = waitpid(-1, NULL, WNOHANG);
+    }
+    if(childPid == -1)
+        perror("smash error: waitpid failed");
+
+
+    for(int finishedId : jobsToDelete)
+    {
+        removeJobById(finishedId)
+    }
+}
+
+JobsList::JobEntry *JobsList::getJobById(int jobId) {
+    for(JobEntry* job: this->jobsVec)
+    {
+        if(job->jobId == jobId){
+            return job;
+        }
+    }
+    return nullptr;
+}
+
+void JobsList::removeJobById(int jobId) {
+    erase(this->getJobById(jobId));
+}
+
+JobsList::JobEntry::JobEntry(int job, std::string command, int pid, bool isStopped)
+    : jobId(job), command(command), processId(pid), startTime(time(NULL)), isStopped(isStopped) {
+
+}
+
+double JobsList::JobEntry::calculateTimeElapsed() const {
+    return difftime(time(NULL), this->startTime);
+}
+
+JobsCommand::JobsCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(cmd_line), jobsList(jobs)
+{}
+
+void JobsCommand::execute() {
+    jobsList->removeFinishedJobs();
+    jobsList->printJobsList();
 }
