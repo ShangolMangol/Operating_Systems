@@ -312,7 +312,7 @@ void JobsList::removeFinishedJobs()
 
     for(int finishedId : jobsToDelete)
     {
-        removeJobById(finishedId)
+        removeJobById(finishedId);
     }
 }
 
