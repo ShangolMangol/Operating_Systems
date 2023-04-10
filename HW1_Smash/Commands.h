@@ -8,6 +8,7 @@
 #define COMMAND_MAX_ARGS (20)
 
 class Command {
+private:
     const char* cmd_line;
 public:
     Command(const char* cmd_line);
