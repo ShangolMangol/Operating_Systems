@@ -18,6 +18,7 @@ public:
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
     const char *getCmdLine() const;
+    std::string getCommandType() const;
 
     void setCmdLine(const char *cmdLine);
 };
@@ -96,27 +97,39 @@ public:
 
 
 class JobsList {
- public:
-  class JobEntry {
-   // TODO: Add your data members
-  };
- // TODO: Add your data members
- public:
-  JobsList();
-  ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
-  JobEntry * getJobById(int jobId);
-  void removeJobById(int jobId);
-  JobEntry * getLastJob(int* lastJobId);
-  JobEntry *getLastStoppedJob(int *jobId);
-  // TODO: Add extra methods or modify exisitng ones as needed
+public:
+    class JobEntry {
+    public:
+        int jobId;
+        std::string command;
+        int processId;
+        time_t startTime;
+        bool isStopped;
+
+        JobEntry(int job, std::string command, int pid, bool isStopped);
+        double calculateTimeElapsed() const;
+    };
+
+    int maxJobIdAvailable;
+    std::vector<JobEntry*> jobsVec;
+
+public:
+    JobsList();
+    ~JobsList();
+    void addJob(Command* cmd, bool isStopped = false);
+    void printJobsList();
+    void killAllJobs();
+    void removeFinishedJobs();
+    JobEntry * getJobById(int jobId);
+    void removeJobById(int jobId);
+    JobEntry * getLastJob(int* lastJobId);
+    JobEntry *getLastStoppedJob(int *jobId);
+    // TODO: Add extra methods or modify exisitng ones as needed
 };
 
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
+ JobsList* jobsList;
  public:
   JobsCommand(const char* cmd_line, JobsList* jobs);
   virtual ~JobsCommand() {}
@@ -185,7 +198,8 @@ class SmallShell {
   // TODO: Add your data members
   SmallShell();
   std::string promptStr;
-  char** lastPwd;
+  char* lastPwd;
+  JobsList jobsList;
 
 public:
   Command *CreateCommand(const char* cmd_line);
@@ -203,10 +217,10 @@ public:
   std::string getPromptStr();
   void setPromptStr(const std::string newPromptStr);
 
-  char** getLastPwd() const;
+  char** getLastPwd();
+  void setLastPwd(char* lastPwd);
 
-  void setLastPwd(char** lastPwd);
-
+  JobsList* getJobsList();
   // TODO: add extra methods as needed
 };
 

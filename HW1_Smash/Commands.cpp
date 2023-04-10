@@ -79,12 +79,12 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr){
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(){
 
 }
 
 SmallShell::~SmallShell() {
-// TODO: add your implementation
+    delete[] lastPwd;
 }
 
 /**
@@ -112,6 +112,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 //      std::vector<char> cstr(lastPwd.c_str(), lastPwd.c_str() + lastPwd.size() + 1);
       return new ChangeDirCommand(cmd_line, smash.getLastPwd());
   }
+  else if (firstWord.compare("cd") == 0)
+  {
+      return new JobsCommand(cmd_line, smash.getJobsList());
+  }
 //  .....
   else {
 //    return new ExternalCommand(cmd_line);
@@ -137,12 +141,16 @@ void SmallShell::setPromptStr(const std::string newPromptStr){
     this->promptStr = newPromptStr;
 }
 
-char** SmallShell::getLastPwd() const {
-    return lastPwd;
+char** SmallShell::getLastPwd() {
+    return &lastPwd;
 }
 
-void SmallShell::setLastPwd(char** lastPwd) {
-    SmallShell::lastPwd = lastPwd;
+void SmallShell::setLastPwd(char* lastPwd1) {
+    SmallShell::lastPwd = lastPwd1;
+}
+
+JobsList *SmallShell::getJobsList() {
+    return &jobsList;
 }
 
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
@@ -182,6 +190,12 @@ void Command::setCmdLine(const char *cmdLine) {
     cmd_line = cmdLine;
 }
 
+string Command::getCommandType() const {
+    string cmd_s = _trim(string(this->cmd_line));
+    string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+    return firstWord;
+}
+
 ShowPidCommand::ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line){}
 
 void ShowPidCommand::execute(){
@@ -211,35 +225,39 @@ void ChangeDirCommand::execute() {
         args[i] = NULL;
     }
     int argNum = _parseCommandLine(this->getCmdLine(), args);
-    if (argNum > 2 ){
+    if (argNum > 2) {
         cerr << "smash error: cd: too many arguments";
-    }
-    else if(argNum < 2) {
+    } else if (argNum < 2) {
         cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
-    }
-    else
-    {
+    } else {
         string path = args[1];
 
-        char* cwd = new char[256];
-        if(getcwd(cwd, sizeof(char)*256) == NULL) {
+        char *cwd = new char[256];
+
+        if (getcwd(cwd, sizeof(char) * 256) == NULL) {
             perror("smash error: getcwd failed");
             return;
         }
-        if(path.compare("-") == 0)
-        {
-            if(lastPwd == nullptr)
-                cerr << "smash error: cd: OLDPWD not set";
-            else
-                path = *lastPwd;
+        if (path.compare("-") == 0) {
+            if (dirLastPwd == nullptr) {
+                cerr << "smash error: cd: OLDPWD not set\n";
+                return;
+            } else
+                path = *dirLastPwd;
         }
 
         //executing cd
-        if (chdir(path.c_str())!=0){
+        if (chdir(path.c_str()) != 0) {
             perror("smash error: chdir failed");
+            return;
         }
-        delete[] this->lastPwd;
-        *(this->lastPwd) = cwd;
+        if (*(this->dirLastPwd) != nullptr) {
+            delete[] *(this->dirLastPwd);
+        }
+        *dirLastPwd = cwd;
     }
-
+    for (int i = 0; i < 25; i++) {
+        if(args[i] != NULL)
+            free(args[i]);
+    }
 }
