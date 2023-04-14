@@ -111,7 +111,7 @@ public:
 public:
     JobsList();
     ~JobsList();
-    void addJob(Command* cmd, bool isStopped = false);
+    void addJob(Command* cmd, int pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -123,6 +123,8 @@ public:
     bool isEmpty() const;
     int getJobsAmount() const;
     void printOnQuit();
+    void removeJobByPID(int pid);
+    void updateMaxId();
 };
 
 class JobsCommand : public BuiltInCommand {
