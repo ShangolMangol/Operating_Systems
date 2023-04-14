@@ -562,7 +562,7 @@ void BackgroundCommand::execute(){
         }
     }
 
-    cout << pJobEntry->command << " : " << pJobEntry->processId;
+    cout << pJobEntry->command << " : " << pJobEntry->processId << endl;
     int kill_res = kill(pJobEntry->processId, SIGCONT);
     if (kill_res == -1)
     {
@@ -702,12 +702,6 @@ void ExternalCommand::execute() {
         }
         else
         {
-//            if(isBackgroundCommand)
-//            {
-//                SmallShell& smash = SmallShell::getInstance();
-//                smash.getJobsList()->addJob(this, false);
-//            }
-
             string command = string(argv[0]);
             command = "/bin/"+command;
             free(argv[0]);
