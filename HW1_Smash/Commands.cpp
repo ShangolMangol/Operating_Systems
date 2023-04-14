@@ -636,7 +636,12 @@ void KillCommand::execute()
         return;
     }
 
-    cout << "signal number " << sigNum << "was sent to pid " << pJobEntry->processId;
+    if(sigNum == SIGSTOP)
+    {
+        pJobEntry->isStopped = true;
+    }
+
+    cout << "signal number " << sigNum << " was sent to pid " << pJobEntry->processId << endl;
 
 
 }
@@ -725,13 +730,11 @@ void ExternalCommand::execute() {
         }
         else
         {
-            cout<<"waiting for child"<<endl;
             int resultChild = waitpid(childPid, NULL, 0);
             if(resultChild == -1){
                 perror("smash error: waitpid failed");
                 return;
             }
-            cout << "done waiting" << endl;
         }
     }
 
