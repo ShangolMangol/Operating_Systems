@@ -121,6 +121,8 @@ public:
     JobEntry *getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify exisitng ones as needed
     bool isEmpty() const;
+    int getJobsAmount() const;
+    void printOnQuit();
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -156,6 +158,15 @@ private:
 public:
     QuitCommand(const char* cmd_line, JobsList* jobs);
     virtual ~QuitCommand() {}
+    void execute() override;
+};
+
+class KillCommand : public BuiltInCommand {
+private:
+    JobsList* jobsPointer;
+public:
+    KillCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~KillCommand() {}
     void execute() override;
 };
 
