@@ -80,7 +80,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(){
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()){
 
 }
 
@@ -170,6 +170,10 @@ JobsList *SmallShell::getJobsList() {
     return &jobsList;
 }
 
+int SmallShell::getSmashPid(){
+    return this->smashPid;
+}
+
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
 {
     string command = "chprompt";
@@ -224,7 +228,7 @@ GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(cmd_
 }
 
 void GetCurrDirCommand::execute() {
-    char cwd[256];
+    char cwd[COMMAND_ARGS_MAX_LENGTH];
     if(getcwd(cwd, sizeof(cwd)) == NULL)
         perror("smash error: getcwd failed");
     else
@@ -238,8 +242,8 @@ ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd)
 }
 
 void ChangeDirCommand::execute() {
-    char *args[25];
-    for (int i = 0; i < 25; i++) {
+    char *args[COMMAND_MAX_ARGS+1];
+    for (int i = 0; i <= COMMAND_MAX_ARGS; i++) {
         args[i] = NULL;
     }
     int argNum = _parseCommandLine(this->getCmdLine(), args);
@@ -249,10 +253,10 @@ void ChangeDirCommand::execute() {
         cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
     } else {
         string path = args[1];
+        releaseArgsArray(args);
+        char *cwd = new char[COMMAND_ARGS_MAX_LENGTH];
 
-        char *cwd = new char[256];
-
-        if (getcwd(cwd, sizeof(char) * 256) == NULL) {
+        if (getcwd(cwd, sizeof(char) * COMMAND_ARGS_MAX_LENGTH) == NULL) {
             perror("smash error: getcwd failed");
             return;
         }

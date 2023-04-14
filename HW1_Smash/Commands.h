@@ -133,8 +133,9 @@ class JobsCommand : public BuiltInCommand {
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
- public:
+private:
+    JobsList* jobsPointer;
+public:
   ForegroundCommand(const char* cmd_line, JobsList* jobs);
   virtual ~ForegroundCommand() {}
   void execute() override;
@@ -207,6 +208,7 @@ class SmallShell {
   std::string promptStr;
   char* lastPwd;
   JobsList jobsList;
+  int smashPid;
 
 public:
   Command *CreateCommand(const char* cmd_line);
@@ -218,6 +220,7 @@ public:
 
     return instance;
   }
+
   ~SmallShell();
   void executeCommand(const char* cmd_line);
 
@@ -229,6 +232,7 @@ public:
 
   JobsList* getJobsList();
   // TODO: add extra methods as needed
+  int getSmashPid();
 };
 
 #endif //SMASH_COMMAND_H_
