@@ -87,14 +87,6 @@ class ShowPidCommand : public BuiltInCommand {
 };
 
 class JobsList;
-class QuitCommand : public BuiltInCommand {
-// TODO: Add your data members
-public:
-  QuitCommand(const char* cmd_line, JobsList* jobs);
-  virtual ~QuitCommand() {}
-  void execute() override;
-};
-
 
 class JobsList {
 public:
@@ -111,6 +103,9 @@ public:
     };
 
     int maxJobIdAvailable;
+
+    int getMaxJobIdAvailable() const;
+
     std::vector<JobEntry*> jobsVec;
 
 public:
@@ -125,6 +120,7 @@ public:
     JobEntry * getLastJob(int* lastJobId);
     JobEntry *getLastStoppedJob(int *jobId);
     // TODO: Add extra methods or modify exisitng ones as needed
+    bool isEmpty() const;
 };
 
 class JobsCommand : public BuiltInCommand {
@@ -145,11 +141,21 @@ class ForegroundCommand : public BuiltInCommand {
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
+private:
+    JobsList* jobsPointer;
  public:
   BackgroundCommand(const char* cmd_line, JobsList* jobs);
   virtual ~BackgroundCommand() {}
   void execute() override;
+};
+
+class QuitCommand : public BuiltInCommand {
+private:
+    JobsList* jobsPointer;
+public:
+    QuitCommand(const char* cmd_line, JobsList* jobs);
+    virtual ~QuitCommand() {}
+    void execute() override;
 };
 
 class TimeoutCommand : public BuiltInCommand {
@@ -197,6 +203,7 @@ class SmallShell {
  private:
   // TODO: Add your data members
   SmallShell();
+
   std::string promptStr;
   char* lastPwd;
   JobsList jobsList;
