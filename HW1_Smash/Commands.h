@@ -30,10 +30,15 @@ class BuiltInCommand : public Command {
 };
 
 class ExternalCommand : public Command {
- public:
+private:
+    bool isComplexCommand;
+    bool isBackgroundCommand;
+public:
   ExternalCommand(const char* cmd_line);
   virtual ~ExternalCommand() {}
   void execute() override;
+  bool isComplex() const;
+  bool isBeckGround() const;
 };
 
 class PipeCommand : public Command {

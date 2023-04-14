@@ -298,10 +298,10 @@ JobsList::JobsList(): maxJobIdAvailable(1) {}
 JobsList::~JobsList(){
     killAllJobs();
 }
-void JobsList::addJob(Command* cmd, bool isStopped){
+void JobsList::addJob(Command* cmd, int pid, bool isStopped){
     this->removeFinishedJobs();
     JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
-                                   cmd->getCmdLine(), getpid(), isStopped);
+                                   cmd->getCmdLine(), pid, isStopped);
     maxJobIdAvailable++;
     jobsVec.push_back(newJob);
 }
@@ -314,7 +314,7 @@ void JobsList::printJobsList() {
     this->removeFinishedJobs();
     std::sort(jobsVec.begin(), jobsVec.end(), compareJobs);
     for (JobEntry* job : jobsVec) {
-        cout << "[" << job->jobId << "]" << job->command << " : " << job->processId
+        cout << "[" << job->jobId << "] " << job->command << " : " << job->processId<<" "
              << job->calculateTimeElapsed() << " secs";
         if(job->isStopped)
             cout << " (stopped)";
@@ -350,8 +350,7 @@ void JobsList::removeFinishedJobs()
     if(childPid == -1 && jobsToDelete.size() != (unsigned int) this->getJobsAmount())
         perror("smash error: waitpid failed");
 
-
-    for(int finishedId : jobsToDelete)
+    for(int finishedPId : jobsToDelete)
     {
         removeJobByPID(finishedPId);
     }
@@ -368,7 +367,6 @@ JobsList::JobEntry *JobsList::getJobById(int jobId) {
 }
 
 void JobsList::removeJobById(int jobId) {
-
     for(auto job = jobsVec.begin(); job< jobsVec.end(); job++)
     {
         if((*job)->jobId == jobId) {
