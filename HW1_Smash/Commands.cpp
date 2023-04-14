@@ -105,24 +105,24 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   if (firstWordBuiltIn.compare("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
   }
-  else if (firstWord.compare("showpid") == 0) {
+  else if (firstWordBuiltIn.compare("showpid") == 0) {
     return new ShowPidCommand(cmd_line);
   }
-  else if (firstWord.compare("chprompt") == 0){
+  else if (firstWordBuiltIn.compare("chprompt") == 0){
       return new ChangePromptCommand(cmd_s);
   }
-  else if (firstWord.compare("cd") == 0){
+  else if (firstWordBuiltIn.compare("cd") == 0){
       return new ChangeDirCommand(cmd_line, smash.getLastPwd());
   }
-  else if (firstWord.compare("jobs") == 0)
+  else if (firstWordBuiltIn.compare("jobs") == 0)
   {
       return new JobsCommand(cmd_line, smash.getJobsList());
   }
-  else if (firstWord.compare("fg") == 0)
+  else if (firstWordBuiltIn.compare("fg") == 0)
   {
       return new ForegroundCommand(cmd_line, smash.getJobsList());
   }
-  else if (firstWord.compare("bg") == 0)
+  else if (firstWordBuiltIn.compare("bg") == 0)
   {
       return new BackgroundCommand(cmd_line, smash.getJobsList());
   }
@@ -139,7 +139,6 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   else {
 //    return new ExternalCommand(cmd_line);
   }
-
   return nullptr;
 }
 
@@ -260,7 +259,7 @@ void ChangeDirCommand::execute() {
     }
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum > 2) {
-        cerr << "smash error: cd: too many arguments";
+        cerr << "smash error: cd: too many arguments\n";
     } else if (argNum < 2) {
         cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
     } else {
@@ -301,7 +300,7 @@ JobsList::~JobsList(){
 void JobsList::addJob(Command* cmd, bool isStopped){
     this->removeFinishedJobs();
     JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
-                                   cmd->getCommandType(), getpid(), isStopped);
+                                   cmd->getCmdLine(), getpid(), isStopped);
     maxJobIdAvailable++;
     jobsVec.push_back(newJob);
 }
@@ -333,6 +332,7 @@ void JobsList::killAllJobs() {
     removeFinishedJobs();
     jobsVec.clear();
     maxJobIdAvailable = 1;
+    removeFinishedJobs();
 }
 
 void JobsList::removeFinishedJobs()
@@ -565,5 +565,73 @@ void BackgroundCommand::execute(){
         return;
     }
     pJobEntry->isStopped = false;
+}
+
+QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),
+                                                                 jobsPointer(jobs) {}
+
+void QuitCommand::execute()
+{
+    char *args[COMMAND_MAX_ARGS+1]= {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if ((argNum >= 2) && strcmp(args[1], "kill") == 0)
+    {
+        cout << "smash: sending SIGKILL signal to "<< this->jobsPointer->getJobsAmount() << " jobs:\n";
+        jobsPointer->printOnQuit();
+        jobsPointer->killAllJobs();
+    }
+    releaseArgsArray(args);
+    exit(0);
+}
+
+KillCommand::KillCommand(const char* cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line),
+                                                                 jobsPointer(jobs) {}
+
+void KillCommand::execute()
+{
+    char *args[COMMAND_MAX_ARGS+1]= {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    char* killSignalArray = args[1];
+    char* jobIdArray = args[2];
+
+    if(argNum != 3){
+        cerr << "smash error: kill: invalid arguments\n";
+        releaseArgsArray(args);
+        return;
+    }
+
+    if(killSignalArray == NULL || killSignalArray[0] != '-'){
+        cerr << "smash error: kill: invalid arguments\n";
+        releaseArgsArray(args);
+        return;
+    }
+
+    int jobId = -1;
+    int sigNum = -1;
+    try{
+        sigNum = stoi(string(killSignalArray).substr(1, string(killSignalArray).length()-1));
+        jobId = stoi(jobIdArray);
+        releaseArgsArray(args);
+    }
+    catch(...){
+        cerr << "smash error: kill: invalid arguments\n";
+        releaseArgsArray(args);
+        return;
+    }
+
+    JobsList::JobEntry * pJobEntry= jobsPointer->getJobById(jobId);
+    if(pJobEntry == nullptr) {
+        cerr << "smash error: kill: job-id " << jobId << " does not exist\n";
+        return;
+    }
+    int killResultCode = kill(pJobEntry->processId, sigNum);
+    if(killResultCode == -1)
+    {
+        perror("smash error: kill failed");
+        return;
+    }
+
+    cout << "signal number " << sigNum << "was sent to pid " << pJobEntry->processId;
+
 
 }
