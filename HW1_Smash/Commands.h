@@ -14,8 +14,8 @@ public:
     Command(const char* cmd_line);
     virtual ~Command() = default;
     virtual void execute() = 0;
-  //virtual void prepare();
-  //virtual void cleanup();
+  virtual void prepare();
+  virtual void cleanup();
   // TODO: Add your extra methods if needed
     const char *getCmdLine() const;
     std::string getCommandType() const;
@@ -50,13 +50,17 @@ class PipeCommand : public Command {
 };
 
 class RedirectionCommand : public Command {
- // TODO: Add your data members
+    std::string fileName;
+    bool isAppend;
+    std::string subCommand;
  public:
   explicit RedirectionCommand(const char* cmd_line);
   virtual ~RedirectionCommand() {}
   void execute() override;
-  //void prepare() override;
+  void prepare() override;
   //void cleanup() override;
+  static bool isRedirection(const char* cmd_line);
+  static bool isAppendOperator(const char* cmd_line);
 };
 
 class ChangePromptCommand : public BuiltInCommand {

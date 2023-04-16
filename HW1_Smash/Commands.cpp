@@ -7,6 +7,7 @@
 #include <iomanip>
 #include "Commands.h"
 #include <algorithm>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -102,7 +103,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
   SmallShell& smash = SmallShell::getInstance();
 
-  if (firstWordBuiltIn.compare("pwd") == 0) {
+    if (RedirectionCommand::isRedirection(cmd_line))
+    {
+        return new RedirectionCommand(cmd_line);
+    }
+  else if (firstWordBuiltIn.compare("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
   }
   else if (firstWordBuiltIn.compare("showpid") == 0) {
@@ -134,6 +139,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   {
       return new KillCommand(cmd_line, smash.getJobsList());
   }
+
 
 //  .....
   else
@@ -227,6 +233,14 @@ string Command::getCommandType() const {
     string cmd_s = _trim(string(this->cmd_line));
     string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
     return firstWord;
+}
+
+void Command::prepare() {
+
+}
+
+void Command::cleanup() {
+
 }
 
 ShowPidCommand::ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line){}
@@ -640,6 +654,10 @@ void KillCommand::execute()
     {
         pJobEntry->isStopped = true;
     }
+    else if(sigNum == SIGCONT)
+    {
+        pJobEntry->isStopped = false;
+    }
 
     cout << "signal number " << sigNum << " was sent to pid " << pJobEntry->processId << endl;
 
@@ -731,5 +749,92 @@ void ExternalCommand::execute() {
             }
         }
     }
+}
 
+RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line), fileName(), isAppend(false), subCommand() {
+
+    this->isAppend = RedirectionCommand::isAppendOperator(cmd_line);
+
+    string cmdString = string(cmd_line);
+    int placeIndex = cmdString.find('>');
+
+    this->subCommand = cmdString.substr(0, placeIndex);
+    this->subCommand = _trim(subCommand);
+
+    if(isAppend){
+        this->fileName = cmdString.substr(placeIndex + 2);
+    }
+    else{
+        this->fileName = cmdString.substr(placeIndex + 1);
+    }
+    this->fileName = _trim(fileName);
+
+
+}
+
+bool RedirectionCommand::isRedirection(const char *cmd_line) {
+    string cmdString = string(cmd_line);
+    return isAppendOperator(cmd_line) || (cmdString.find('>') != string::npos);
+}
+
+bool RedirectionCommand::isAppendOperator(const char *cmd_line) {
+    string cmdString = string(cmd_line);
+    return (cmdString.find(">>") != string::npos);
+}
+
+void RedirectionCommand::prepare()
+{
+    int resultClose = close(1);
+    if(resultClose < 0)
+    {
+        perror("smash error: close failed");
+        exit(-1);
+    }
+
+    int outputFd;
+    if(this->isAppend){
+        outputFd = open(this->fileName.c_str(), O_CREAT | O_APPEND | O_RDWR, 0666);
+    }
+    else{
+        outputFd = open(this->fileName.c_str(), O_CREAT | O_WRONLY);
+    }
+    if(outputFd < 0)
+    {
+        perror("smash error: open failed");
+        exit(-1);
+    }
+}
+
+void RedirectionCommand::execute()
+{
+    if(fileName.empty())
+    {
+        cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
+        return;
+    }
+    int pid = fork();
+    if(pid == -1)
+    {
+        perror("smash error: fork failed");
+        return;
+    }
+    else if(pid == 0) // child
+    {
+        if(setpgrp() == -1){
+            perror("smash error: setpgrp failed");
+            return;
+        }
+        SmallShell& smash = SmallShell::getInstance();
+        this->prepare();
+        smash.executeCommand(subCommand.c_str());
+        exit(1);
+    }
+    else //father
+    {
+        int resultChild = waitpid(pid, NULL, 0);
+        if(resultChild == -1){
+            perror("smash error: waitpid failed");
+            return;
+        }
+    }
 }
