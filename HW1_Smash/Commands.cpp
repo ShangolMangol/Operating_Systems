@@ -660,8 +660,6 @@ void KillCommand::execute()
     }
 
     cout << "signal number " << sigNum << " was sent to pid " << pJobEntry->processId << endl;
-
-
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line),
