@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <fcntl.h>
 #include <sched.h>
+#include <sys/stat.h>
+
 
 using namespace std;
 
@@ -98,11 +100,15 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 
   string cmd_s = _trim(string(cmd_line));
   string firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
-  string cmdLineCopy = cmd_line;
-  cmdLineCopy.erase(remove(cmdLineCopy.begin(), cmdLineCopy.end(), '&'), cmdLineCopy.end());
-  string firstWordBuiltIn = cmdLineCopy.substr(0, cmdLineCopy.find_first_of(" \n"));
+  string cmdLineCopy = string(_trim(cmd_line));
+  // cmdLineCopy.erase(remove(cmdLineCopy.begin(), cmdLineCopy.end(), '&'), cmdLineCopy.end());
+    string firstWordBuiltIn = firstWord;
+  if(cmdLineCopy[cmdLineCopy.size() - 1] == '&'){
+      cmdLineCopy = cmdLineCopy.substr(0, cmdLineCopy.size()-1);
+      firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+  }
 
-  SmallShell& smash = SmallShell::getInstance();
+    SmallShell& smash = SmallShell::getInstance();
 
     if (RedirectionCommand::isRedirection(cmd_line))
     {
@@ -146,6 +152,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWordBuiltIn.compare("setcore") == 0)
     {
         return new SetcoreCommand(cmd_line, smash.getJobsList());
+    }
+    else if (firstWordBuiltIn.compare("getfiletype") == 0)
+    {
+        return new GetFileTypeCommand(cmd_line);
     }
 
 
