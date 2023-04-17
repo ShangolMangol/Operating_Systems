@@ -8,6 +8,7 @@
 #include "Commands.h"
 #include <algorithm>
 #include <fcntl.h>
+#include <sched.h>
 
 using namespace std;
 
@@ -142,6 +143,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   {
       return new KillCommand(cmd_line, smash.getJobsList());
   }
+    else if (firstWordBuiltIn.compare("setcore") == 0)
+    {
+        return new SetcoreCommand(cmd_line, smash.getJobsList());
+    }
 
 
 //  .....
@@ -978,4 +983,56 @@ bool PipeCommand::isPipeCommand(const char* cmd_line) {
 
 bool PipeCommand::isErrorPipeType(const char* cmd_line) {
     return (string(cmd_line).find("|&") != string::npos);
+}
+
+SetcoreCommand::SetcoreCommand(const char *cmd_line, JobsList* jobs) : BuiltInCommand(cmd_line), jobsPointer(jobs) {
+
+}
+
+void SetcoreCommand::execute() {
+    char *args[COMMAND_MAX_ARGS+1];
+    for (int i = 0; i <= COMMAND_MAX_ARGS; i++) {
+        args[i] = NULL;
+    }
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if (argNum != 3)
+    {
+        cerr << "smash error: setcore: invalid arguments\n";
+        return;
+    }
+    int jobId, coreId;
+    try
+    {
+        jobId = stoi(args[1]);
+        coreId = stoi(args[2]);
+    }catch(...){
+        cerr << "smash error: setcore: invalid arguments\n";
+        return;
+    }
+    JobsList::JobEntry* currentJob = jobsPointer->getJobById(jobId);
+    if(currentJob == nullptr)
+    {
+        cerr << "smash error: setcore: job-id "<< jobId << " does not exist\n";
+        return;
+    }
+
+    cpu_set_t mask;
+    int coresNum = CPU_COUNT(&mask);
+    //int num_cpus = std::thread::hardware_concurrency()
+    if(coreId >= coresNum){
+        cerr << "smash error: setcore: invalid core number\n";
+        return;
+    }
+
+    CPU_ZERO(&mask);
+    CPU_SET(coreId, &mask);
+    int result = sched_setaffinity(currentJob->processId, sizeof(mask), &mask);
+    if(result == -1){
+        perror("smash error: sched_setaffinity failed");
+        return;
+    }
+
+
+
+
 }
