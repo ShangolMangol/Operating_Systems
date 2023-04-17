@@ -107,6 +107,9 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new RedirectionCommand(cmd_line);
     }
+    else if(PipeCommand::isPipeCommand(cmd_line) || PipeCommand::isErrorPipeType(cmd_line)){
+        return new PipeCommand(cmd_line);
+    }
   else if (firstWordBuiltIn.compare("pwd") == 0) {
     return new GetCurrDirCommand(cmd_line);
   }
