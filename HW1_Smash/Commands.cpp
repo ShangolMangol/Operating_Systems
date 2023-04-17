@@ -1074,3 +1074,48 @@ void SetcoreCommand::execute() {
         return;
     }
 }
+
+GetFileTypeCommand::GetFileTypeCommand(const char* cmd_line) : BuiltInCommand(cmd_line) {}
+
+void GetFileTypeCommand::execute()
+{
+    char *args[COMMAND_MAX_ARGS+1] = {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if(argNum!=2) {
+        cerr << "smash error: gettype: invalid arguments\n";
+        releaseArgsArray(args);
+        return;
+    }
+    else
+    {
+        string filename = string(args[1]);
+        struct stat fileStat;
+
+        if (stat(filename.c_str(), &fileStat) == -1) {
+            perror("smash error: stat failed");
+            return;
+        }
+        string fileType="";
+         if (S_ISREG(fileStat.st_mode))
+             fileType="regular file";
+        else if (S_ISDIR(fileStat.st_mode))
+             fileType="directory";
+        else if (S_ISCHR(fileStat.st_mode))
+             fileType="character device";
+        else if (S_ISBLK(fileStat.st_mode))
+             fileType = "block device";
+        else if (S_ISFIFO(fileStat.st_mode))
+            fileType = "FIFO";
+        else if (S_ISLNK(fileStat.st_mode))
+            fileType = "symbolic link";
+        else if (S_ISSOCK(fileStat.st_mode))
+            fileType = "socket";
+
+        long fileSize = fileStat.st_size;
+
+        cout << filename << "\'s type is \""<< fileType << "\" and takes up " << fileSize << " bytes\n";
+
+    releaseArgsArray(args);
+
+    }
+}
