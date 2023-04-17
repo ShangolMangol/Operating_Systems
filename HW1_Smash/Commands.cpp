@@ -758,6 +758,11 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line)
 
     this->subCommand = cmdString.substr(0, placeIndex);
     this->subCommand = _trim(subCommand);
+    if(subCommand[subCommand.size() - 1] == '&')
+    {
+        this->subCommand = cmdString.substr(0, subCommand.size() - 1);
+        this->subCommand = _trim(subCommand);
+    }
 
     if(isAppend){
         this->fileName = cmdString.substr(placeIndex + 2);
@@ -791,10 +796,10 @@ void RedirectionCommand::prepare()
 
     int outputFd;
     if(this->isAppend){
-        outputFd = open(this->fileName.c_str(), O_CREAT | O_APPEND | O_RDWR, 0666);
+        outputFd = open(this->fileName.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
     }
     else{
-        outputFd = open(this->fileName.c_str(), O_CREAT | O_WRONLY);
+        outputFd = open(this->fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     }
     if(outputFd < 0)
     {
@@ -825,6 +830,7 @@ void RedirectionCommand::execute()
         SmallShell& smash = SmallShell::getInstance();
         this->prepare();
         smash.executeCommand(subCommand.c_str());
+        close(1);
         exit(1);
     }
     else //father
@@ -835,4 +841,138 @@ void RedirectionCommand::execute()
             return;
         }
     }
+}
+
+
+PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line)
+{
+    this->isErrorPipe = PipeCommand::isErrorPipeType(cmd_line);
+
+    string cmdString = string(cmd_line);
+    int placeIndex = cmdString.find('|');
+
+    this->command1 = cmdString.substr(0, placeIndex);
+    this->command1 = _trim(command1);
+    if(command1[command1.size() - 1] == '&')
+    {
+        this->command1 = cmdString.substr(0, command1.size() - 1);
+        this->command1 = _trim(command1);
+    }
+    if(isErrorPipe){
+        this->command2 = cmdString.substr(placeIndex + 2);
+    }
+    else{
+        this->command2 = cmdString.substr(placeIndex + 1);
+    }
+    this->command2 = _trim(command2);
+    if(command2[command2.size() - 1] == '&')
+    {
+        this->command2 = cmdString.substr(0, command2.size() - 1);
+        this->command2 = _trim(command2);
+    }
+}
+
+void PipeCommand::execute() {
+
+    int pid1 = fork();
+    if(pid1==-1){
+        perror("smash error: fork failed");
+        return;
+    }
+    else if(pid1==0)
+    {
+        int fd[2];
+        if(pipe(fd) != 0)
+        {
+            perror("smash error: pipe failed");
+            return;
+        }
+        int pid2 = fork();
+        if(pid2==-1){
+            perror("smash error: fork failed");
+            exit(-1);
+        }
+
+        else if(pid2 == 0) //command1, writing
+        {
+            if(setpgrp() == -1){
+                perror("smash error: setpgrp failed");
+                exit(-1);
+            }
+            if(close(fd[0]) == -1)
+            {
+                perror("smash error: close failed");
+                exit(-1);
+            }
+
+            int dupResult;
+            if(this->isErrorPipe)
+            {
+                dupResult = dup2(fd[1], 2);
+            }
+            else
+            {
+                dupResult = dup2(fd[1], 1);
+            }
+            if(dupResult == -1)
+            {
+                perror("smash error: dup2 failed");
+                exit(-1);
+            }
+
+            if(close(fd[1]) == -1)
+            {
+                perror("smash error: close failed");
+                exit(-1);
+            }
+            SmallShell& smash = SmallShell::getInstance();
+            smash.executeCommand(command1.c_str());
+            exit(1);
+        }
+        else //command2, father of command1, reading
+        {
+            if(setpgrp() == -1){
+                perror("smash error: setpgrp failed");
+                exit(-1);
+            }
+            if (close(fd[1])==-1){
+                perror("smash error: close failed");
+                exit(-1);
+            }
+
+            int dupResult = dup2(fd[0], 0);
+            if(dupResult == -1){
+                perror("smash error: dup2 failed");
+                exit(-1);
+            }
+            if (close(fd[0])==-1){
+                perror("smash error: close failed");
+                exit(-1);
+            }
+
+            int resultChild = waitpid(pid2, NULL, 0);
+            if(resultChild == -1){
+                perror("smash error: waitpid failed");
+                return;
+            }
+            SmallShell& smash = SmallShell::getInstance();
+            smash.executeCommand(command2.c_str());
+            exit(1);
+        }
+    }
+    else //father
+    {
+        int resultChild = waitpid(pid1, NULL, 0);
+        if(resultChild == -1){
+            perror("smash error: waitpid failed");
+            return;
+        }
+    }
+}
+bool PipeCommand::isPipeCommand(const char* cmd_line) {
+    return (string(cmd_line).find('|') != string::npos);
+}
+
+bool PipeCommand::isErrorPipeType(const char* cmd_line) {
+    return (string(cmd_line).find("|&") != string::npos);
 }

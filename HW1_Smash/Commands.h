@@ -42,11 +42,16 @@ public:
 };
 
 class PipeCommand : public Command {
-  // TODO: Add your data members
+  std::string command1;
+  std::string command2;
+  bool isErrorPipe;
  public:
   PipeCommand(const char* cmd_line);
   virtual ~PipeCommand() {}
   void execute() override;
+
+    static bool isPipeCommand(const char* cmd_line);
+    static bool isErrorPipeType(const char* cmd_line);
 };
 
 class RedirectionCommand : public Command {
