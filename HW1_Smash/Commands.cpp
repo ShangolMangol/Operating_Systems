@@ -360,6 +360,9 @@ void JobsList::killAllJobs() {
 
 void JobsList::removeFinishedJobs()
 {
+    SmallShell& smash = SmallShell::getInstance();
+    if(getpid() != smash.getSmashPid())
+        return;
     if(this->isEmpty())
         return;
     vector<int> jobsToDelete;
@@ -710,7 +713,12 @@ void ExternalCommand::execute() {
     {
         if(setpgrp() == -1){
             perror("smash error: setpgrp failed");
-            return;
+            exit(-1);
+        }
+        int innerChildPid = getpid();
+        SmallShell &smash = SmallShell::getInstance();
+        if (isBackgroundCommand) {
+            smash.getJobsList()->addJob(this, innerChildPid, false);
         }
 
         if(this->isComplexCommand)
@@ -719,22 +727,39 @@ void ExternalCommand::execute() {
             char* path = (char*) "/bin/bash";
             char *const argComplex[] = {path , cFlag, cmdline, NULL};
             int execv_res = execv("/bin/bash", argComplex);
-            if(execv_res == -1){
+            if (execv_res == -1) {
+                if (isBackgroundCommand) {
+                    smash.getJobsList()->removeJobByPID(innerChildPid);
+                }
                 perror("smash error: execv failed");
-                return;
+                exit(-1);
             }
-        }
-        else
+        } else
         {
-            string command = string(argv[0]);
-            command = "/bin/"+command;
-            free(argv[0]);
-            argv[0] = new char[command.length()+1];
-            strcpy(argv[0], command.c_str());
-            int execv_res = execv(command.c_str(), argv);
+            char *path = getenv("PATH"); // Get the current value of the PATH environment variable
+            if(path == NULL){
+                perror("smash error: getenv failed");
+                exit(-1);
+            }
+            char *new_path = new char[strlen(path) + 2 + 1]; // Allocate memory for a new string that includes the current directory
+
+            // Construct the new PATH environment variable string
+            sprintf(new_path, ".:%s", path);
+            if(setenv("PATH", new_path, 1) == -1) // Set the new PATH environment variable
+            {
+                perror("smash error: setenv failed");
+                exit(-1);
+            }
+            int execv_res = execvp(argv[0], argv);
             if(execv_res == -1){
-                perror("smash error: execv failed");
-                return;
+                if(isBackgroundCommand){
+                    SmallShell& smash = SmallShell::getInstance();
+                    smash.getJobsList()->removeJobByPID(innerChildPid);
+
+                }
+                perror("smash error: execvp failed");
+                delete[] new_path;
+                exit(-1);
             }
         }
 
@@ -893,7 +918,7 @@ void PipeCommand::execute() {
         if(pipe(fd) != 0)
         {
             perror("smash error: pipe failed");
-            return;
+            exit(-1);
         }
         int pid2 = fork();
         if(pid2==-1){
@@ -961,7 +986,7 @@ void PipeCommand::execute() {
             int resultChild = waitpid(pid2, NULL, 0);
             if(resultChild == -1){
                 perror("smash error: waitpid failed");
-                return;
+                exit(-1);
             }
             SmallShell& smash = SmallShell::getInstance();
             smash.executeCommand(command2.c_str());
@@ -1017,7 +1042,8 @@ void SetcoreCommand::execute() {
     }
 
     cpu_set_t mask;
-    int coresNum = CPU_COUNT(&mask);
+//    CPU_ZERO(&mask);
+//    int coresNum = CPU_COUNT(&mask);
     //int num_cpus = std::thread::hardware_concurrency()
     if(coreId >= coresNum){
         cerr << "smash error: setcore: invalid core number\n";
