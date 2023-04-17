@@ -711,7 +711,7 @@ void ExternalCommand::execute() {
     }
     else if(childPid == 0) //child
     {
-        if(setpgrp() == -1){
+        if (setpgrp() == -1) {
             perror("smash error: setpgrp failed");
             exit(-1);
         }
@@ -721,11 +721,10 @@ void ExternalCommand::execute() {
             smash.getJobsList()->addJob(this, innerChildPid, false);
         }
 
-        if(this->isComplexCommand)
-        {
-            char* cFlag =(char*) "-c";
-            char* path = (char*) "/bin/bash";
-            char *const argComplex[] = {path , cFlag, cmdline, NULL};
+        if (this->isComplexCommand) {
+            char *cFlag = (char *) "-c";
+            char *path = (char *) "/bin/bash";
+            char *const argComplex[] = {path, cFlag, cmdline, NULL};
             int execv_res = execv("/bin/bash", argComplex);
             if (execv_res == -1) {
                 if (isBackgroundCommand) {
@@ -858,7 +857,7 @@ void RedirectionCommand::execute()
     {
         if(setpgrp() == -1){
             perror("smash error: setpgrp failed");
-            return;
+            exit(-1);
         }
         SmallShell& smash = SmallShell::getInstance();
         this->prepare();
@@ -1045,6 +1044,13 @@ void SetcoreCommand::execute() {
 //    CPU_ZERO(&mask);
 //    int coresNum = CPU_COUNT(&mask);
     //int num_cpus = std::thread::hardware_concurrency()
+    long coresNum = sysconf(_SC_NPROCESSORS_ONLN);
+    if(coresNum == -1)
+    {
+        perror("smash error: sched_setaffinity failed");
+        return;
+    }
+    cerr << "coreNum: " << coresNum << endl;
     if(coreId >= coresNum){
         cerr << "smash error: setcore: invalid core number\n";
         return;
@@ -1057,8 +1063,4 @@ void SetcoreCommand::execute() {
         perror("smash error: sched_setaffinity failed");
         return;
     }
-
-
-
-
 }
