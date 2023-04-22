@@ -24,8 +24,6 @@ int main(int argc, char* argv[]) {
         perror("smash error: failed to set alarm handler");
     }
 
-
-
     SmallShell& smash = SmallShell::getInstance();
 
     while(true) {

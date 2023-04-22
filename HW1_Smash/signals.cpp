@@ -41,7 +41,20 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-  cout << "smash: got an alarm\n";
-  
+    cout << "smash: got an alarm\n";
+    SmallShell& smash = SmallShell::getInstance();
+
+    TimeoutCommand* topTimeout = smash.topTimeoutCommand();
+    int currentEnd = topTimeout->getExpectedEnd();
+
+    while (!smash.isTimeoutQueueEmpty() && currentEnd == smash.topTimeoutCommand()->getExpectedEnd())
+    {
+        if(kill(smash.topTimeoutCommand()->getProcessId(), SIGKILL) == -1){
+            perror("smash error: kill failed");
+        }
+        cout << "smash: " << smash.topTimeoutCommand()->getCmdLine() << " timed out!\n";
+        smash.popTimeoutCommand();
+    }
+
 }
 

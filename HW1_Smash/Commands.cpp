@@ -608,6 +608,7 @@ void ForegroundCommand::execute() {
     smash.setCurrentFgCommand(jobCommand);
     int waitPid_res = waitpid(jobPid, NULL, WUNTRACED);
     smash.setCurrentFgPid(-1);
+    smash.setCurrentFgCommand("");
     if (waitPid_res == -1) {
         perror("smash error: waitpid failed");
         return;
@@ -1211,7 +1212,6 @@ void ChmodCommand::execute() {
     string pathToFile = args[2];
     releaseArgsArray(args);
 
-
     const char* modeChar = newModeStr.c_str();
     char* endptr;
     long int newMode = strtol(modeChar, &endptr, 8);
@@ -1227,4 +1227,83 @@ void ChmodCommand::execute() {
         perror("smash error: chmod failed");
         return;
     }
+}
+
+TimeoutCommand::TimeoutCommand(const char* cmd_line) : BuiltInCommand(cmd_line){}
+
+void TimeoutCommand::execute() {
+    char *args[COMMAND_MAX_ARGS+1] = {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    string durationStr = args[1];
+    string command = args[2];
+    for(int i=3; i< argNum; i++)
+    {
+        string tempString = args[i];
+        command += " " + tempString;
+    }
+    releaseArgsArray(args);
+    try{
+        this->duration = stoi(durationStr);
+    } catch(...)
+    {
+        return;
+    }
+    this->startTime = time(NULL);
+    this->expectedEnd = this->startTime + this->duration;
+
+    int currentAlarm = alarm(this->duration);
+    if(currentAlarm < a)
+    int childPid = fork();
+    if(childPid == -1){
+        perror("smash error: fork failed");
+        return;
+    }
+    if(childPid == 0){
+        if(setpgrp() == -1){
+            perror("smash error: setpgrp failed");
+            exit(-1);
+        }
+        this->processId = getpid();
+        SmallShell& smash = SmallShell::getInstance();
+        smash.insertTimeoutCommand(
+                new TimeoutCommand(this->getCmdLine(), this->processId, this->startTime,
+                                                      this->expectedEnd, this->duration));
+        smash.executeCommand(command.c_str());
+        exit(1);
+    }
+    else //father
+    {
+        if(command[command.size()-1] != '&')
+        {
+            SmallShell &smash = SmallShell::getInstance();
+            smash.setCurrentFgPid(childPid);
+            smash.setCurrentFgCommand(this->getCmdLine());
+            int waitPid_res = waitpid(childPid, NULL, WUNTRACED);
+            smash.setCurrentFgPid(-1);
+            smash.setCurrentFgCommand("");
+            if (waitPid_res == -1) {
+                perror("smash error: waitpid failed");
+                return;
+            }
+        }
+    }
+}
+
+int TimeoutCommand::getExpectedEnd() const{
+    return expectedEnd;
+}
+
+int TimeoutCommand::getProcessId() const{
+    return this->processId;
+}
+void TimeoutCommand::setExpectedEnd(int expectedEnd) {
+    this->expectedEnd = expectedEnd;
+}
+
+TimeoutCommand::TimeoutCommand(const char *cmd_line, int pid, int start, int end, int duration)
+    : BuiltInCommand(cmd_line), processId(pid), startTime(start), expectedEnd(end), duration(duration) {}
+
+bool CompareTimeout::operator()(TimeoutCommand* t1, TimeoutCommand* t2)
+{
+    return t1->getExpectedEnd() > t2->getExpectedEnd();
 }
