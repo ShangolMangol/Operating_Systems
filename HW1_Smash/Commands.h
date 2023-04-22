@@ -126,6 +126,7 @@ public:
     JobsList();
     ~JobsList();
     void addJob(Command* cmd, int pid, bool isStopped = false);
+    void addJob(std::string cmd, int pid, bool isStopped = false);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();
@@ -228,6 +229,12 @@ class SmallShell {
   char* lastPwd;
   JobsList jobsList;
   int smashPid;
+  int currentFgPid;
+  std::string currentFgCommand;
+public:
+    int getCurrentFgPid() const;
+
+    void setCurrentFgPid(int currentFgPid);
 
 public:
   Command *CreateCommand(const char* cmd_line);

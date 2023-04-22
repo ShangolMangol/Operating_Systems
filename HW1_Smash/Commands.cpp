@@ -84,7 +84,7 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()){
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()), currentFgPid(-1){
 
 }
 
@@ -212,6 +212,22 @@ JobsList *SmallShell::getJobsList() {
 
 int SmallShell::getSmashPid(){
     return this->smashPid;
+}
+
+int SmallShell::getCurrentFgPid() const {
+    return currentFgPid;
+}
+
+void SmallShell::setCurrentFgPid(int currentFgPid) {
+    this->currentFgPid = currentFgPid;
+}
+
+string SmallShell::getCurrentFgCommand() const{
+    return this->currentFgCommand;
+}
+
+void SmallShell::setCurrentFgCommand(string newFgCommand){
+    this->currentFgCommand = newFgCommand;
 }
 
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
@@ -549,6 +565,7 @@ void ForegroundCommand::execute() {
 
     cout << pJobEntry->command << " : " << pJobEntry->processId << endl;
     int jobPid = pJobEntry->processId;
+    string jobCommand = pJobEntry->command;
     jobsPointer->removeJobById(jobId);
     int waitPid_res = waitpid(jobPid, NULL, 0);
     if (waitPid_res == -1) {
@@ -881,7 +898,12 @@ void RedirectionCommand::execute()
     }
     else //father
     {
-        int resultChild = waitpid(pid, NULL, 0);
+        SmallShell& smash = SmallShell::getInstance();
+        smash.setCurrentFgPid(pid);
+        smash.setCurrentFgCommand(this->getCmdLine());
+        int resultChild = waitpid(pid, NULL, WUNTRACED);
+        smash.setCurrentFgPid(-1);
+        smash.setCurrentFgCommand("");
         if(resultChild == -1){
             perror("smash error: waitpid failed");
             return;
@@ -1008,14 +1030,17 @@ void PipeCommand::execute()
                 perror("smash error: waitpid failed");
                 exit(-1);
             }
-            SmallShell& smash = SmallShell::getInstance();
             smash.executeCommand(command2.c_str());
             exit(1);
         }
     }
     else //father
     {
-        int resultChild = waitpid(pid1, NULL, 0);
+
+        SmallShell &smash = SmallShell::getInstance();
+        smash.setCurrentFgPid(pid1);
+        int resultChild = waitpid(pid1, NULL, WUNTRACED);
+        smash.setCurrentFgPid(-1);
         if(resultChild == -1){
             perror("smash error: waitpid failed");
             return;
