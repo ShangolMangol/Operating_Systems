@@ -253,6 +253,7 @@ TimeoutCommand *SmallShell::topTimeoutCommand() {
 
 void SmallShell::popTimeoutCommand() {
     TimeoutCommand* toDelete = this->timeoutQueue.top();
+    delete toDelete->getCmdLine();
     this->timeoutQueue.pop();
     delete toDelete;
 }
@@ -1251,8 +1252,12 @@ void TimeoutCommand::execute() {
     this->startTime = time(NULL);
     this->expectedEnd = this->startTime + this->duration;
 
+    SmallShell& smash = SmallShell::getInstance();
     int currentAlarm = alarm(this->duration);
-    if(currentAlarm < a)
+    if(currentAlarm != 0 && currentAlarm < this->duration)
+    {
+        alarm(currentAlarm);
+    }
     int childPid = fork();
     if(childPid == -1){
         perror("smash error: fork failed");
@@ -1264,10 +1269,7 @@ void TimeoutCommand::execute() {
             exit(-1);
         }
         this->processId = getpid();
-        SmallShell& smash = SmallShell::getInstance();
-        smash.insertTimeoutCommand(
-                new TimeoutCommand(this->getCmdLine(), this->processId, this->startTime,
-                                                      this->expectedEnd, this->duration));
+
         smash.executeCommand(command.c_str());
         exit(1);
     }
@@ -1275,7 +1277,6 @@ void TimeoutCommand::execute() {
     {
         if(command[command.size()-1] != '&')
         {
-            SmallShell &smash = SmallShell::getInstance();
             smash.setCurrentFgPid(childPid);
             smash.setCurrentFgCommand(this->getCmdLine());
             int waitPid_res = waitpid(childPid, NULL, WUNTRACED);
@@ -1300,8 +1301,10 @@ void TimeoutCommand::setExpectedEnd(int expectedEnd) {
     this->expectedEnd = expectedEnd;
 }
 
-TimeoutCommand::TimeoutCommand(const char *cmd_line, int pid, int start, int end, int duration)
+TimeoutCommand::TimeoutCommand(const char* cmd_line, int pid, int start, int end, int duration)
     : BuiltInCommand(cmd_line), processId(pid), startTime(start), expectedEnd(end), duration(duration) {}
+
+
 
 bool CompareTimeout::operator()(TimeoutCommand* t1, TimeoutCommand* t2)
 {
