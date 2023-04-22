@@ -105,7 +105,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     string firstWordBuiltIn = firstWord;
   if(cmdLineCopy[cmdLineCopy.size() - 1] == '&'){
       cmdLineCopy = cmdLineCopy.substr(0, cmdLineCopy.size()-1);
-      firstWord = cmd_s.substr(0, cmd_s.find_first_of(" \n"));
+      firstWordBuiltIn = cmdLineCopy.substr(0, cmdLineCopy.find_first_of(" \n"));
   }
 
     SmallShell& smash = SmallShell::getInstance();
@@ -156,6 +156,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     else if (firstWordBuiltIn.compare("getfiletype") == 0)
     {
         return new GetFileTypeCommand(cmd_line);
+    }
+    else if (firstWordBuiltIn.compare("chmod") == 0)
+    {
+        return new ChmodCommand(cmd_line);
     }
 
 
@@ -914,7 +918,14 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line)
     }
 }
 
-void PipeCommand::execute() {
+void PipeCommand::execute()
+{
+    int fd[2];
+    if(pipe(fd) != 0)
+    {
+        perror("smash error: pipe failed");
+        exit(-1);
+    }
 
     int pid1 = fork();
     if(pid1==-1){
@@ -923,12 +934,12 @@ void PipeCommand::execute() {
     }
     else if(pid1==0)
     {
-        int fd[2];
-        if(pipe(fd) != 0)
-        {
-            perror("smash error: pipe failed");
-            exit(-1);
-        }
+//        int fd[2];
+//        if(pipe(fd) != 0)
+//        {
+//            perror("smash error: pipe failed");
+//            exit(-1);
+//        }
         int pid2 = fork();
         if(pid2==-1){
             perror("smash error: fork failed");
@@ -1060,7 +1071,6 @@ void SetcoreCommand::execute() {
         perror("smash error: sched_setaffinity failed");
         return;
     }
-    cerr << "coreNum: " << coresNum << endl;
     if(coreId >= coresNum){
         cerr << "smash error: setcore: invalid core number\n";
         return;
@@ -1117,5 +1127,39 @@ void GetFileTypeCommand::execute()
 
     releaseArgsArray(args);
 
+    }
+}
+
+ChmodCommand::ChmodCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
+
+}
+
+void ChmodCommand::execute() {
+    char *args[COMMAND_MAX_ARGS+1] = {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if (argNum != 3) {
+        cerr << "smash error: gettype: invalid arguments\n";
+        releaseArgsArray(args);
+        return;
+    }
+    string newModeStr = args[1];
+    string pathToFile = args[2];
+    releaseArgsArray(args);
+
+
+    const char* modeChar = newModeStr.c_str();
+    char* endptr;
+    long int newMode = strtol(modeChar, &endptr, 8);
+
+    if (endptr == modeChar || errno == EINVAL || *endptr != '\0')
+    {
+        cerr << "smash error: chmod: invalid arguments\n";
+        return;
+    }
+
+    if(chmod(pathToFile.c_str(), newMode) == -1)
+    {
+        perror("smash error: chmod failed");
+        return;
     }
 }
