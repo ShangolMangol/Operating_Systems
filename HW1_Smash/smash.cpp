@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
 
 
     SmallShell& smash = SmallShell::getInstance();
+
     while(true) {
         std::cout << smash.getPromptStr() << "> ";
         std::string cmd_line;

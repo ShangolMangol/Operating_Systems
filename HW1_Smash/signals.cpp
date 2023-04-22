@@ -26,10 +26,22 @@ void ctrlZHandler(int sig_num) {
 }
 
 void ctrlCHandler(int sig_num) {
-  // TODO: Add your implementation
+    cout << "smash: got ctrl-C\n";
+    SmallShell& smash = SmallShell::getInstance();
+    int processToKill = smash.getCurrentFgPid();
+    if(processToKill==-1){
+        return;
+    }
+    if(kill(processToKill, SIGKILL) == -1){
+        perror("smash error: kill failed");
+    }
+    cout << "smash: process " << processToKill << " was killed\n";
+    smash.setCurrentFgCommand("");
+    smash.setCurrentFgPid(-1);
 }
 
 void alarmHandler(int sig_num) {
-  // TODO: Add your implementation
+  cout << "smash: got an alarm\n";
+  
 }
 

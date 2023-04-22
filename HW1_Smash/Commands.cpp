@@ -358,6 +358,14 @@ void JobsList::addJob(Command* cmd, int pid, bool isStopped){
     jobsVec.push_back(newJob);
 }
 
+void JobsList::addJob(string cmd, int pid, bool isStopped){
+    this->removeFinishedJobs();
+    JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
+                                    cmd, pid, isStopped);
+    maxJobIdAvailable++;
+    jobsVec.push_back(newJob);
+}
+
 bool compareJobs(JobsList::JobEntry *job1, JobsList::JobEntry *job2) {
     return job1->jobId < job2->jobId;
 }
@@ -567,7 +575,12 @@ void ForegroundCommand::execute() {
     int jobPid = pJobEntry->processId;
     string jobCommand = pJobEntry->command;
     jobsPointer->removeJobById(jobId);
-    int waitPid_res = waitpid(jobPid, NULL, 0);
+
+    SmallShell &smash = SmallShell::getInstance();
+    smash.setCurrentFgPid(jobPid);
+    smash.setCurrentFgCommand(jobCommand);
+    int waitPid_res = waitpid(jobPid, NULL, WUNTRACED);
+    smash.setCurrentFgPid(-1);
     if (waitPid_res == -1) {
         perror("smash error: waitpid failed");
         return;
@@ -803,7 +816,12 @@ void ExternalCommand::execute() {
         }
         else
         {
-            int resultChild = waitpid(childPid, NULL, 0);
+            SmallShell& smash = SmallShell::getInstance();
+            smash.setCurrentFgPid(childPid);
+            smash.setCurrentFgCommand(this->getCmdLine());
+            int resultChild = waitpid(childPid, NULL, WUNTRACED);
+            smash.setCurrentFgPid(-1);
+            smash.setCurrentFgCommand("");
             if(resultChild == -1){
                 perror("smash error: waitpid failed");
                 return;
@@ -942,13 +960,6 @@ PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line)
 
 void PipeCommand::execute()
 {
-    int fd[2];
-    if(pipe(fd) != 0)
-    {
-        perror("smash error: pipe failed");
-        exit(-1);
-    }
-
     int pid1 = fork();
     if(pid1==-1){
         perror("smash error: fork failed");
@@ -956,12 +967,12 @@ void PipeCommand::execute()
     }
     else if(pid1==0)
     {
-//        int fd[2];
-//        if(pipe(fd) != 0)
-//        {
-//            perror("smash error: pipe failed");
-//            exit(-1);
-//        }
+        int fd[2];
+        if(pipe(fd) != 0)
+        {
+            perror("smash error: pipe failed");
+            exit(-1);
+        }
         int pid2 = fork();
         if(pid2==-1){
             perror("smash error: fork failed");
@@ -1024,8 +1035,10 @@ void PipeCommand::execute()
                 perror("smash error: close failed");
                 exit(-1);
             }
-
-            int resultChild = waitpid(pid2, NULL, 0);
+            SmallShell& smash = SmallShell::getInstance();
+            smash.setCurrentFgPid(pid2);
+            int resultChild = waitpid(pid2, NULL, WUNTRACED);
+            smash.setCurrentFgPid(-1);
             if(resultChild == -1){
                 perror("smash error: waitpid failed");
                 exit(-1);

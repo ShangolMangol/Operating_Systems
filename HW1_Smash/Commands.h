@@ -259,6 +259,9 @@ public:
   JobsList* getJobsList();
   // TODO: add extra methods as needed
   int getSmashPid();
+
+  std::string getCurrentFgCommand() const;
+  void setCurrentFgCommand(std::string newFgCommand);
 };
 
 #endif //SMASH_COMMAND_H_
