@@ -239,7 +239,7 @@ void SmallShell::setCurrentFgCommand(string newFgCommand){
     return timeoutQueue;
 }
 
-void SmallShell::insertTimeoutCommand(TimeoutCommand *cmd) {
+void SmallShell::insertTimeoutCommand(TimeoutCommand *cmd){
     this->timeoutQueue.push(cmd);
 }
 
@@ -538,8 +538,12 @@ void JobsList::updateMaxId() {
 }
 
 JobsList::JobEntry::JobEntry(int job, std::string command, int pid, bool isStopped)
-    : jobId(job), command(command), processId(pid), startTime(time(NULL)), isStopped(isStopped) {
-
+    : jobId(job), command(command), processId(pid), startTime(0), isStopped(isStopped) {
+    this->startTime = time(NULL);
+    if(this->startTime == -1) {
+         perror("smash error: time failed");
+         exit(-1);
+    }
 }
 
 double JobsList::JobEntry::calculateTimeElapsed() const {
@@ -1275,6 +1279,13 @@ void TimeoutCommand::execute() {
     }
     else //father
     {
+        this->processId = childPid;
+        char* copy_str = new char[strlen(this->getCmdLine())]; // Allocate memory for the copy
+        strcpy(copy_str, this->getCmdLine());
+
+        smash.insertTimeoutCommand(
+                new TimeoutCommand(copy_str, childPid, this->startTime,
+                                   this->expectedEnd, this->duration));
         if(command[command.size()-1] != '&')
         {
             smash.setCurrentFgPid(childPid);
