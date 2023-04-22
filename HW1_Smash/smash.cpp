@@ -14,11 +14,15 @@ int main(int argc, char* argv[]) {
     }
 
     // Set up the signal handler
-    struct sigaction sigAction;
-    sigAction.sa_handler = alarmHandler;
-    sigemptyset(&sigAction.sa_mask);
-    sigAction.sa_flags = 0;
-    sigaction(SIGALRM, &sigAction, NULL);
+    struct sigaction action;
+    action.sa_handler = alarmHandler;
+    if(sigemptyset(&action.sa_mask) == -1) {
+        perror("smash error: sigemptyset failed");
+    }
+    action.sa_flags = SA_RESTART;
+    if(sigaction(SIGALRM, &action, NULL) == -1) {
+        perror("smash error: failed to set alarm handler");
+    }
 
 
 

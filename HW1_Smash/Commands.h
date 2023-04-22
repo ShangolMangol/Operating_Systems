@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <queue>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
@@ -187,13 +188,30 @@ public:
     void execute() override;
 };
 
+
+
 class TimeoutCommand : public BuiltInCommand {
 /* Bonus */
-// TODO: Add your data members
- public:
+private:
+    int processId;
+    int startTime;
+    int expectedEnd;
+    int duration;
+public:
+    int getExpectedEnd() const;
+    int getProcessId() const;
+    void setExpectedEnd(int expectedEnd);
+
+public:
   explicit TimeoutCommand(const char* cmd_line);
-  virtual ~TimeoutCommand() {}
+    explicit TimeoutCommand(const char* cmd_line, int pid, int start, int end, int duration);
+    virtual ~TimeoutCommand() {}
   void execute() override;
+};
+
+class CompareTimeout {
+public:
+    bool operator() (TimeoutCommand* t1, TimeoutCommand* t2);
 };
 
 class ChmodCommand : public BuiltInCommand {
@@ -231,16 +249,20 @@ class SmallShell {
   int smashPid;
   int currentFgPid;
   std::string currentFgCommand;
+  std::priority_queue<TimeoutCommand*, std::vector<TimeoutCommand*>, CompareTimeout> timeoutQueue;
 public:
+    std::priority_queue<TimeoutCommand *, std::vector<TimeoutCommand *>, CompareTimeout> &getTimeoutQueue();
+    void insertTimeoutCommand(TimeoutCommand* cmd);
+    bool isTimeoutQueueEmpty() const;
+    TimeoutCommand* topTimeoutCommand();
+    void popTimeoutCommand();
     int getCurrentFgPid() const;
 
     void setCurrentFgPid(int currentFgPid);
-
-public:
-  Command *CreateCommand(const char* cmd_line);
-  SmallShell(SmallShell const&)      = delete; // disable copy ctor
-  void operator=(SmallShell const&)  = delete; // disable = operator
-  static SmallShell& getInstance() // make SmallShell singleton
+    Command *CreateCommand(const char* cmd_line);
+    SmallShell(SmallShell const&)      = delete; // disable copy ctor
+    void operator=(SmallShell const&)  = delete; // disable = operator
+    static SmallShell& getInstance() // make SmallShell singleton
   {
     static SmallShell instance; // Guaranteed to be destroyed.
 

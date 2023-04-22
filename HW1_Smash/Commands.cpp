@@ -84,7 +84,8 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()), currentFgPid(-1){
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()),
+    currentFgPid(-1), currentFgCommand(""), timeoutQueue() {
 
 }
 
@@ -161,6 +162,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     {
         return new ChmodCommand(cmd_line);
     }
+    else if (firstWordBuiltIn.compare("timeout") == 0)
+    {
+        return new TimeoutCommand(cmd_line);
+    }
 
 
 //  .....
@@ -228,6 +233,28 @@ string SmallShell::getCurrentFgCommand() const{
 
 void SmallShell::setCurrentFgCommand(string newFgCommand){
     this->currentFgCommand = newFgCommand;
+}
+
+ priority_queue<TimeoutCommand *, std::vector<TimeoutCommand *>, CompareTimeout> & SmallShell::getTimeoutQueue() {
+    return timeoutQueue;
+}
+
+void SmallShell::insertTimeoutCommand(TimeoutCommand *cmd) {
+    this->timeoutQueue.push(cmd);
+}
+
+bool SmallShell::isTimeoutQueueEmpty() const {
+    return this->timeoutQueue.empty();
+}
+
+TimeoutCommand *SmallShell::topTimeoutCommand() {
+    return this->timeoutQueue.top();
+}
+
+void SmallShell::popTimeoutCommand() {
+    TimeoutCommand* toDelete = this->timeoutQueue.top();
+    this->timeoutQueue.pop();
+    delete toDelete;
 }
 
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
