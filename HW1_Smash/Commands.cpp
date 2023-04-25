@@ -179,6 +179,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
 void SmallShell::executeCommand(const char *cmd_line) {
   // TODO: Add your implementation here
   // for example:
+  if(string(cmd_line).empty())
+  {
+      return;
+  }
   jobsList.removeFinishedJobs();
    Command* cmd = CreateCommand(cmd_line);
    cmd->execute();
@@ -260,17 +264,24 @@ void SmallShell::popTimeoutCommand() {
 
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
 {
-    string command = "chprompt";
-    if(cmd_s.length() >= command.length()+1)
-        this->secondWord = cmd_s.substr(command.length()+1, cmd_s.find_first_of(" \n"));
-    else
+    char *args[COMMAND_MAX_ARGS+1]= {NULL};
+    int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if(argNum>1){
+        this->secondWord = args[1];
+    }
+    else{
         this->secondWord = "";
+    }
+    releaseArgsArray(args);
 }
 
 void ChangePromptCommand::execute()
 {
     SmallShell& smash = SmallShell::getInstance();
+//    cout << "before: " << secondWord << endl;
     secondWord = _trim(secondWord);
+//    cout << "after: " << secondWord << endl;
+
     if(secondWord.length() == 0){
         smash.setPromptStr("smash");
     }
