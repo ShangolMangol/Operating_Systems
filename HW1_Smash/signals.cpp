@@ -16,7 +16,7 @@ void ctrlZHandler(int sig_num) {
     string cmd = smash.getCurrentFgCommand();
     if (cmd.empty())
         return;
-    smash.getJobsList()->addJob(cmd, processToStop, true);
+    smash.getJobsList()->addExistingJob(cmd, processToStop, true);
     if (kill(processToStop, SIGSTOP) == -1) {
         perror("smash error: kill failed");
     }

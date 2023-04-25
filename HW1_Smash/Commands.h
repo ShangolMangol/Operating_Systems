@@ -122,12 +122,12 @@ public:
     int getMaxJobIdAvailable() const;
 
     std::vector<JobEntry*> jobsVec;
-
+    std::vector<JobEntry*> allJobs;
 public:
     JobsList();
     ~JobsList();
     void addJob(Command* cmd, int pid, bool isStopped = false);
-    void addJob(std::string cmd, int pid, bool isStopped = false);
+    void addExistingJob(std::string cmd, int pid, bool isStopped);
     void printJobsList();
     void killAllJobs();
     void removeFinishedJobs();

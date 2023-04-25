@@ -364,11 +364,12 @@ void ChangeDirCommand::execute() {
             return;
         }
         if (path.compare("-") == 0) {
-            if (dirLastPwd == nullptr) {
+            if (*dirLastPwd == nullptr) {
                 cerr << "smash error: cd: OLDPWD not set\n";
                 return;
-            } else
+            } else {
                 path = *dirLastPwd;
+            }
         }
 
         //executing cd
@@ -395,13 +396,34 @@ void JobsList::addJob(Command* cmd, int pid, bool isStopped){
                                    cmd->getCmdLine(), pid, isStopped);
     maxJobIdAvailable++;
     jobsVec.push_back(newJob);
+    allJobs.push_back(newJob);
 }
 
-void JobsList::addJob(string cmd, int pid, bool isStopped){
+
+
+void JobsList::addExistingJob(string cmd, int pid, bool isStopped){
     this->removeFinishedJobs();
-    JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
+    int jobId = -1;
+    for(JobEntry* job : allJobs)
+    {
+        if(job->processId == pid)
+            jobId = job->jobId;
+    }
+    bool newJobFlag = false;
+    if(jobId == -1)
+    {
+        jobId = maxJobIdAvailable;
+        maxJobIdAvailable++;
+        newJobFlag = true;
+    }
+    JobEntry* newJob = new JobEntry(jobId,
                                     cmd, pid, isStopped);
-    maxJobIdAvailable++;
+    if(newJobFlag)
+    {
+        allJobs.push_back(newJob);
+    }
+    if(jobId >= maxJobIdAvailable)
+        maxJobIdAvailable = jobId + 1;
     jobsVec.push_back(newJob);
 }
 
@@ -430,9 +452,13 @@ void JobsList::killAllJobs() {
         }
     }
     removeFinishedJobs();
+    for(JobEntry* jobEntry : allJobs)
+    {
+        delete jobEntry;
+    }
+    allJobs.clear();
     jobsVec.clear();
     maxJobIdAvailable = 1;
-    removeFinishedJobs();
 }
 
 void JobsList::removeFinishedJobs()
@@ -456,6 +482,17 @@ void JobsList::removeFinishedJobs()
     {
         removeJobByPID(finishedPId);
     }
+    for(int finishedPid : jobsToDelete)
+    {
+        for(auto job = allJobs.begin(); job< allJobs.end(); job++)
+        {
+            if(finishedPid == (*job)->processId)
+            {
+                delete *job;
+                allJobs.erase(job);
+            }
+        }
+    }
 }
 
 JobsList::JobEntry *JobsList::getJobById(int jobId) {
@@ -472,7 +509,6 @@ void JobsList::removeJobById(int jobId) {
     for(auto job = jobsVec.begin(); job< jobsVec.end(); job++)
     {
         if((*job)->jobId == jobId) {
-            delete *job;
             jobsVec.erase(job);
         }
     }
@@ -529,7 +565,6 @@ void JobsList::removeJobByPID(int pid)
     for(auto job = jobsVec.begin(); job< jobsVec.end(); job++)
     {
         if((*job)->processId == pid) {
-            delete *job;
             jobsVec.erase(job);
         }
     }
@@ -734,6 +769,12 @@ void KillCommand::execute()
     catch(...){
         cerr << "smash error: kill: invalid arguments\n";
         releaseArgsArray(args);
+        return;
+    }
+
+    if(sigNum < 1 || sigNum > 31)
+    {
+        cerr << "smash error: kill: invalid arguments\n";
         return;
     }
 
