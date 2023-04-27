@@ -59,12 +59,14 @@ class RedirectionCommand : public Command {
     std::string fileName;
     bool isAppend;
     std::string subCommand;
+    int stdoutTemp;
+    bool isFailed;
  public:
   explicit RedirectionCommand(const char* cmd_line);
   virtual ~RedirectionCommand() {}
   void execute() override;
   void prepare() override;
-  //void cleanup() override;
+  void cleanup() override;
   static bool isRedirection(const char* cmd_line);
   static bool isAppendOperator(const char* cmd_line);
 };
@@ -246,7 +248,7 @@ class SmallShell {
   std::string promptStr;
   char* lastPwd;
   JobsList jobsList;
-  int smashPid;
+  static int smashPid;
   int currentFgPid;
   std::string currentFgCommand;
   std::priority_queue<TimeoutCommand*, std::vector<TimeoutCommand*>, CompareTimeout> timeoutQueue;
@@ -257,7 +259,6 @@ public:
     TimeoutCommand* topTimeoutCommand();
     void popTimeoutCommand();
     int getCurrentFgPid() const;
-
     void setCurrentFgPid(int currentFgPid);
     Command *CreateCommand(const char* cmd_line);
     SmallShell(SmallShell const&)      = delete; // disable copy ctor

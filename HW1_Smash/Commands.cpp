@@ -262,6 +262,8 @@ void SmallShell::popTimeoutCommand() {
     delete toDelete;
 }
 
+
+
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
 {
     char *args[COMMAND_MAX_ARGS+1]= {NULL};
@@ -324,7 +326,7 @@ ShowPidCommand::ShowPidCommand(const char* cmd_line) : BuiltInCommand(cmd_line){
 
 void ShowPidCommand::execute(){
     SmallShell& smash = SmallShell::getInstance();
-    cout << "smash pid is " << smash.getSmashPid() << "\n";
+    cout << "smash pid is " << smash.getSmashPid() << endl;
 }
 
 GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
@@ -351,9 +353,9 @@ void ChangeDirCommand::execute() {
     }
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum > 2) {
-        cerr << "smash error: cd: too many arguments\n";
+        cerr << "smash error: cd: too many arguments" << endl;
     } else if (argNum < 2) {
-        cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
+        cerr << "smash error:> \"" << this->getCmdLine() << "\"" << endl;
     } else {
         string path = args[1];
         releaseArgsArray(args);
@@ -365,7 +367,7 @@ void ChangeDirCommand::execute() {
         }
         if (path.compare("-") == 0) {
             if (*dirLastPwd == nullptr) {
-                cerr << "smash error: cd: OLDPWD not set\n";
+                cerr << "smash error: cd: OLDPWD not set" << endl;
                 return;
             } else {
                 path = *dirLastPwd;
@@ -439,7 +441,7 @@ void JobsList::printJobsList() {
              << job->calculateTimeElapsed() << " secs";
         if(job->isStopped)
             cout << " (stopped)";
-        cout << "\n";
+        cout << endl;
     }
 }
 
@@ -556,7 +558,7 @@ int JobsList::getJobsAmount() const {
 void JobsList::printOnQuit() {
     for(JobEntry* job: jobsVec)
     {
-        cout << job->processId << ": " << job->command << "\n";
+        cout << job->processId << ": " << job->command << endl;
     }
 }
 
@@ -612,7 +614,7 @@ void ForegroundCommand::execute() {
     char *args[COMMAND_MAX_ARGS + 1] = {NULL};
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum > 2 || argNum < 1) {
-        cerr << "smash error: fg: invalid arguments\n";
+        cerr << "smash error: fg: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     } else if (argNum == 2) {
@@ -621,11 +623,11 @@ void ForegroundCommand::execute() {
             pJobEntry = jobsPointer->getJobById(jobId);
             releaseArgsArray(args);
         } catch (...) {
-            cerr << "smash error: fg: invalid arguments\n";
+            cerr << "smash error: fg: invalid arguments" << endl;
             return;
         }
         if (jobId <= 0) {
-            cerr << "smash error: fg: job-id " << jobId << " does not exist\n";
+            cerr << "smash error: fg: job-id " << jobId << " does not exist" << endl;
             return;
         }
     } else {
@@ -697,7 +699,7 @@ void BackgroundCommand::execute(){
         }
         if(!pJobEntry->isStopped)
         {
-            cerr << "smash error: bg: job-id "<< jobId <<" is already running in the background\n";
+            cerr << "smash error: bg: job-id "<< jobId <<" is already running in the background" << endl;
         }
     }
     else
@@ -705,7 +707,7 @@ void BackgroundCommand::execute(){
         pJobEntry = jobsPointer->getLastStoppedJob(&jobId);
         if(pJobEntry == nullptr)
         {
-            cerr << "smash error: bg: there is no stopped jobs to resume\n";
+            cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
             return;
         }
     }
@@ -729,7 +731,7 @@ void QuitCommand::execute()
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if ((argNum >= 2) && strcmp(args[1], "kill") == 0)
     {
-        cout << "smash: sending SIGKILL signal to "<< this->jobsPointer->getJobsAmount() << " jobs:\n";
+        cout << "smash: sending SIGKILL signal to "<< this->jobsPointer->getJobsAmount() << " jobs:" << endl;
         jobsPointer->printOnQuit();
         jobsPointer->killAllJobs();
     }
@@ -748,13 +750,13 @@ void KillCommand::execute()
     char* jobIdArray = args[2];
 
     if(argNum != 3){
-        cerr << "smash error: kill: invalid arguments\n";
+        cerr << "smash error: kill: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
 
     if(killSignalArray == NULL || killSignalArray[0] != '-'){
-        cerr << "smash error: kill: invalid arguments\n";
+        cerr << "smash error: kill: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
@@ -767,20 +769,20 @@ void KillCommand::execute()
         releaseArgsArray(args);
     }
     catch(...){
-        cerr << "smash error: kill: invalid arguments\n";
+        cerr << "smash error: kill: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
 
     if(sigNum < 1 || sigNum > 31)
     {
-        cerr << "smash error: kill: invalid arguments\n";
+        cerr << "smash error: kill: invalid arguments" << endl;
         return;
     }
 
     JobsList::JobEntry * pJobEntry= jobsPointer->getJobById(jobId);
     if(pJobEntry == nullptr) {
-        cerr << "smash error: kill: job-id " << jobId << " does not exist\n";
+        cerr << "smash error: kill: job-id " << jobId << " does not exist" << endl;
         return;
     }
     int killResultCode = kill(pJobEntry->processId, sigNum);
@@ -828,7 +830,7 @@ void ExternalCommand::execute() {
     int argNum = _parseCommandLine(cmdline, argv);
     if(argNum < 1)
     {
-        cerr << "smash error:> \""<<getCmdLine()<<"\"\n";
+        cerr << "smash error:> \""<<getCmdLine()<<"\"" << endl;
         return;
     }
 
@@ -864,21 +866,21 @@ void ExternalCommand::execute() {
             }
         } else
         {
-            char *path = getenv("PATH"); // Get the current value of the PATH environment variable
-            if(path == NULL){
-                perror("smash error: getenv failed");
-                exit(-1);
-            }
-            char *new_path = new char[strlen(path) + 2 + 1]; // Allocate memory for a new string that includes the current directory
-
-            // Construct the new PATH environment variable string
-            sprintf(new_path, ".:%s", path);
-            if(setenv("PATH", new_path, 1) == -1) // Set the new PATH environment variable
-            {
-                perror("smash error: setenv failed");
-                exit(-1);
-            }
-            delete[] new_path;
+//            char *path = getenv("PATH"); // Get the current value of the PATH environment variable
+//            if(path == NULL){
+//                perror("smash error: getenv failed");
+//                exit(-1);
+//            }
+//            char *new_path = new char[strlen(path) + 2 + 1]; // Allocate memory for a new string that includes the current directory
+//
+//            // Construct the new PATH environment variable string
+//            sprintf(new_path, ".:%s", path);
+//            if(setenv("PATH", new_path, 1) == -1) // Set the new PATH environment variable
+//            {
+//                perror("smash error: setenv failed");
+//                exit(-1);
+//            }
+//            delete[] new_path;
 
             int execv_res = execvp(argv[0], argv);
             if(execv_res == -1){
@@ -916,7 +918,8 @@ void ExternalCommand::execute() {
     }
 }
 
-RedirectionCommand::RedirectionCommand(const char *cmd_line) : Command(cmd_line), fileName(), isAppend(false), subCommand() {
+RedirectionCommand::RedirectionCommand(const char *cmd_line)
+    : Command(cmd_line), fileName(), isAppend(false), subCommand(), stdoutTemp(), isFailed(false) {
 
     this->isAppend = RedirectionCommand::isAppendOperator(cmd_line);
 
@@ -954,64 +957,100 @@ bool RedirectionCommand::isAppendOperator(const char *cmd_line) {
 
 void RedirectionCommand::prepare()
 {
+    if(fileName.empty())
+    {
+        cerr << "smash error:> \"" << this->getCmdLine() << "\"" << endl;
+        return;
+    }
+
+    stdoutTemp = dup(1);
+    if(stdoutTemp == -1){
+        isFailed = true;
+        perror("smash error: dup failed");
+        return;
+    }
+
     int resultClose = close(1);
     if(resultClose < 0)
     {
         perror("smash error: close failed");
-        exit(-1);
+        return;
     }
 
     int outputFd;
     if(this->isAppend){
-        outputFd = open(this->fileName.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+        outputFd = open(this->fileName.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0655);
     }
     else{
-        outputFd = open(this->fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        outputFd = open(this->fileName.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0655);
     }
     if(outputFd < 0)
     {
         perror("smash error: open failed");
-        exit(-1);
+        return;
     }
 }
 
 void RedirectionCommand::execute()
 {
-    if(fileName.empty())
+    this->prepare();
+    if(this->isFailed)
+        return;
+
+    SmallShell& smash = SmallShell::getInstance();
+
+    smash.executeCommand(subCommand.c_str());
+    this->cleanup();
+
+
+//    int pid = fork();
+//    if(pid == -1)
+//    {
+//        perror("smash error: fork failed");
+//        return;
+//    }
+//    else if(pid == 0) // child
+//    {
+//        if(setpgrp() == -1){
+//            perror("smash error: setpgrp failed");
+//            exit(-1);
+//        }
+//        SmallShell& smash = SmallShell::getInstance();
+//        this->prepare();
+//        smash.executeCommand(subCommand.c_str());
+//        close(1);
+//        exit(1);
+//    }
+//    else //father
+//    {
+//        SmallShell& smash = SmallShell::getInstance();
+//        smash.setCurrentFgPid(pid);
+//        smash.setCurrentFgCommand(this->getCmdLine());
+//        int resultChild = waitpid(pid, NULL, WUNTRACED);
+//        smash.setCurrentFgPid(-1);
+//        smash.setCurrentFgCommand("");
+//        if(resultChild == -1){
+//            perror("smash error: waitpid failed");
+//            return;
+//        }
+//    }
+}
+
+void RedirectionCommand::cleanup() {
+
+    if(close(1) == -1)
     {
-        cerr << "smash error:> \"" << this->getCmdLine() << "\"\n";
+        perror("smash error: close failed");
         return;
     }
-    int pid = fork();
-    if(pid == -1)
+    if(dup2(stdoutTemp, 1) == -1)
     {
-        perror("smash error: fork failed");
+        perror("smash error: close failed");
         return;
     }
-    else if(pid == 0) // child
-    {
-        if(setpgrp() == -1){
-            perror("smash error: setpgrp failed");
-            exit(-1);
-        }
-        SmallShell& smash = SmallShell::getInstance();
-        this->prepare();
-        smash.executeCommand(subCommand.c_str());
-        close(1);
-        exit(1);
-    }
-    else //father
-    {
-        SmallShell& smash = SmallShell::getInstance();
-        smash.setCurrentFgPid(pid);
-        smash.setCurrentFgCommand(this->getCmdLine());
-        int resultChild = waitpid(pid, NULL, WUNTRACED);
-        smash.setCurrentFgPid(-1);
-        smash.setCurrentFgCommand("");
-        if(resultChild == -1){
-            perror("smash error: waitpid failed");
-            return;
-        }
+    if(close(stdoutTemp) == -1) {
+        perror("smash error: close failed");
+        return;
     }
 }
 
@@ -1330,7 +1369,7 @@ void SetcoreCommand::execute() {
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum != 3)
     {
-        cerr << "smash error: setcore: invalid arguments\n";
+        cerr << "smash error: setcore: invalid arguments" << endl;
         return;
     }
     int jobId, coreId;
@@ -1339,7 +1378,7 @@ void SetcoreCommand::execute() {
         jobId = stoi(args[1]);
         coreId = stoi(args[2]);
     }catch(...){
-        cerr << "smash error: setcore: invalid arguments\n";
+        cerr << "smash error: setcore: invalid arguments" << endl;
         return;
     }
     JobsList::JobEntry* currentJob = jobsPointer->getJobById(jobId);
