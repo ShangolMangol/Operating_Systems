@@ -317,9 +317,7 @@ ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd
 void ChangePromptCommand::execute()
 {
     SmallShell& smash = SmallShell::getInstance();
-//    cout << "before: " << secondWord << endl;
     secondWord = _trim(secondWord);
-//    cout << "after: " << secondWord << endl;
 
     if(secondWord.length() == 0){
         smash.setPromptStr("smash");
@@ -1554,11 +1552,8 @@ void TimeoutCommand::execute() {
     this->expectedEnd = this->startTime + this->duration;
 
     SmallShell& smash = SmallShell::getInstance();
-    int currentAlarm = alarm(this->duration);
-    if(currentAlarm != 0 && currentAlarm < this->duration)
-    {
-        alarm(currentAlarm);
-    }
+//    int currentAlarm = alarm(this->duration);
+
     int childPid = fork();
     if(childPid == -1){
         perror("smash error: fork failed");
@@ -1581,7 +1576,10 @@ void TimeoutCommand::execute() {
         this->processId = childPid;
         char* copy_str = new char[strlen(this->getCmdLine())]; // Allocate memory for the copy
         strcpy(copy_str, this->getCmdLine());
-
+        if(currentAlarm != 0 && currentAlarm < this->duration)
+        {
+            alarm(currentAlarm);
+        }
         smash.insertTimeoutCommand(
                 new TimeoutCommand(copy_str, childPid, this->startTime,
                                    this->expectedEnd, this->duration));
