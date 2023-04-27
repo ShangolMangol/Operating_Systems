@@ -396,14 +396,14 @@ JobsList::~JobsList(){
 }
 void JobsList::addJob(Command* cmd, int pid, bool isStopped){
     this->removeFinishedJobs();
+    char* copy_str = new char[strlen(cmd->getCmdLine())]; // Allocate memory for the copy
+    strcpy(copy_str, cmd->getCmdLine());
     JobEntry* newJob = new JobEntry(this->maxJobIdAvailable,
-                                   cmd->getCmdLine(), pid, isStopped);
+                                   copy_str, pid, isStopped);
     maxJobIdAvailable++;
     jobsVec.push_back(newJob);
     allJobs.push_back(newJob);
 }
-
-
 
 void JobsList::addExistingJob(string cmd, int pid, bool isStopped){
     this->removeFinishedJobs();
@@ -861,9 +861,9 @@ void ExternalCommand::execute() {
             char *const argComplex[] = {path, cFlag, cmdline, NULL};
             int execv_res = execv("/bin/bash", argComplex);
             if (execv_res == -1) {
-                if (isBackgroundCommand) {
-                    smash.getJobsList()->removeJobByPID(innerChildPid);
-                }
+//                if (isBackgroundCommand) {
+//                    smash.getJobsList()->removeJobByPID(innerChildPid);
+//                }
                 perror("smash error: execv failed");
                 exit(-1);
             }
@@ -872,11 +872,11 @@ void ExternalCommand::execute() {
 
             int execv_res = execvp(argv[0], argv);
             if(execv_res == -1){
-                if(isBackgroundCommand){
-                    SmallShell& smash = SmallShell::getInstance();
-                    smash.getJobsList()->removeJobByPID(innerChildPid);
-
-                }
+//                if(isBackgroundCommand){
+//                    SmallShell& smash = SmallShell::getInstance();
+//                    smash.getJobsList()->removeJobByPID(innerChildPid);
+//
+//                }
                 perror("smash error: execvp failed");
                 exit(-1);
             }
