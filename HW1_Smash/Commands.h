@@ -258,6 +258,8 @@ public:
     bool isTimeoutQueueEmpty() const;
     TimeoutCommand* topTimeoutCommand();
     void popTimeoutCommand();
+    void removeTimeoutByPid(int pid);
+    void scheduleTimeoutAlarm();
     int getCurrentFgPid() const;
     void setCurrentFgPid(int currentFgPid);
     Command *CreateCommand(const char* cmd_line);

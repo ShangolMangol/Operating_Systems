@@ -57,16 +57,6 @@ void alarmHandler(int sig_num) {
         smash.popTimeoutCommand();
     }
 
-    if(smash.isTimeoutQueueEmpty())
-        return;
-
-    int curTime = time(NULL);
-    if(curTime == -1)
-    {
-        perror("smash error: time failed");
-        return;
-    }
-    int closestTimeout = smash.topTimeoutCommand()->getExpectedEnd() - curTime;
-    alarm(closestTimeout);
+    smash.scheduleTimeoutAlarm();
 }
 

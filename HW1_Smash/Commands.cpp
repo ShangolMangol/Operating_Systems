@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sched.h>
 #include <sys/stat.h>
+#include <set>
 
 
 using namespace std;
@@ -264,6 +265,40 @@ void SmallShell::popTimeoutCommand() {
     delete toDelete;
 }
 
+void SmallShell::removeTimeoutByPid(int pid) {
+    int queueSize = this->timeoutQueue.size();
+    vector<TimeoutCommand*> tempVec;
+    for(int i = 0; i< queueSize; i++)
+    {
+        if(timeoutQueue.top()->getProcessId() == pid) {
+            this->popTimeoutCommand();
+            break;
+        }
+        tempVec.push_back(timeoutQueue.top());
+        this->timeoutQueue.pop();
+    }
+
+    for(TimeoutCommand* cmd: tempVec){
+        this->timeoutQueue.push(cmd);
+    }
+}
+
+void SmallShell::scheduleTimeoutAlarm() {
+    if(isTimeoutQueueEmpty())
+    {
+        alarm(0);
+        return;
+    }
+    int curTime = time(NULL);
+    if(curTime == -1)
+    {
+        perror("smash error: time failed");
+        return;
+    }
+    int closestTimeout = this->topTimeoutCommand()->getExpectedEnd() - curTime;
+    alarm(closestTimeout);
+
+}
 
 
 ChangePromptCommand::ChangePromptCommand(std::string cmd_s) : BuiltInCommand(cmd_s.c_str())
@@ -488,6 +523,8 @@ void JobsList::removeFinishedJobs()
     }
     for(int finishedPid : jobsToDelete)
     {
+        smash.removeTimeoutByPid(finishedPid);
+        smash.scheduleTimeoutAlarm();
         for(auto job = allJobs.begin(); job< allJobs.end(); job++)
         {
             if(finishedPid == (*job)->processId)
@@ -1489,8 +1526,14 @@ TimeoutCommand::TimeoutCommand(const char* cmd_line) : BuiltInCommand(cmd_line){
 void TimeoutCommand::execute() {
     char *args[COMMAND_MAX_ARGS+1] = {NULL};
     int argNum = _parseCommandLine(this->getCmdLine(), args);
+    if(argNum < 3)
+    {
+        cerr << "smash error: timeout: invalid arguments" << endl;
+        return;
+    }
     string durationStr = args[1];
     string command = args[2];
+
     for(int i=3; i< argNum; i++)
     {
         string tempString = args[i];
@@ -1499,6 +1542,10 @@ void TimeoutCommand::execute() {
     releaseArgsArray(args);
     try{
         this->duration = stoi(durationStr);
+        if(duration <= 0){
+            cerr << "smash error: timeout: invalid arguments" << endl;
+            return;
+        }
     } catch(...)
     {
         return;
@@ -1530,6 +1577,7 @@ void TimeoutCommand::execute() {
     }
     else //father
     {
+        int currentAlarm = alarm(this->duration);
         this->processId = childPid;
         char* copy_str = new char[strlen(this->getCmdLine())]; // Allocate memory for the copy
         strcpy(copy_str, this->getCmdLine());
@@ -1544,6 +1592,8 @@ void TimeoutCommand::execute() {
             int waitPid_res = waitpid(childPid, NULL, WUNTRACED);
             smash.setCurrentFgPid(-1);
             smash.setCurrentFgCommand("");
+            smash.removeTimeoutByPid(childPid);
+            smash.scheduleTimeoutAlarm();
             if (waitPid_res == -1) {
                 perror("smash error: waitpid failed");
                 return;
