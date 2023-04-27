@@ -921,7 +921,7 @@ void ExternalCommand::execute() {
 }
 
 RedirectionCommand::RedirectionCommand(const char *cmd_line)
-    : Command(cmd_line), fileName(), isAppend(false), subCommand(), stdoutTemp(), isFailed(false) {
+    : Command(cmd_line), fileName(), isAppend(false), subCommand(), stdoutTemp(-1), isFailed(false) {
 
     this->isAppend = RedirectionCommand::isAppendOperator(cmd_line);
 
@@ -996,12 +996,11 @@ void RedirectionCommand::prepare()
 void RedirectionCommand::execute()
 {
     this->prepare();
-    if(this->isFailed)
-        return;
-
-    SmallShell& smash = SmallShell::getInstance();
-
-    smash.executeCommand(subCommand.c_str());
+    if(!this->isFailed)
+    {
+        SmallShell& smash = SmallShell::getInstance();
+        smash.executeCommand(subCommand.c_str());
+    }
     this->cleanup();
 
 
