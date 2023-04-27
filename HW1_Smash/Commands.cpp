@@ -84,7 +84,9 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(), smashPid(getpid()),
+int SmallShell::smashPid = getpid();
+
+SmallShell::SmallShell() : promptStr("smash"), lastPwd(nullptr), jobsList(),
     currentFgPid(-1), currentFgCommand(""), timeoutQueue() {
 
 }
@@ -337,7 +339,7 @@ void GetCurrDirCommand::execute() {
     if(getcwd(cwd, sizeof(cwd)) == NULL)
         perror("smash error: getcwd failed");
     else
-        cout << cwd << "\n";
+        cout << cwd << endl;
 }
 
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd)
@@ -632,7 +634,7 @@ void ForegroundCommand::execute() {
         }
     } else {
         if (jobsPointer->isEmpty()) {
-            cerr << "smash error: fg: jobs list is empty\n";
+            cerr << "smash error: fg: jobs list is empty" << endl;
             return;
         } else {
             pJobEntry = jobsPointer->getLastJob(&jobId);
@@ -640,7 +642,7 @@ void ForegroundCommand::execute() {
     }
 
     if (pJobEntry == nullptr) {
-        cerr << "smash error: fg: job-id " << jobId << " does not exist\n";
+        cerr << "smash error: fg: job-id " << jobId << " does not exist" << endl;
         return;
     }
     if (pJobEntry->isStopped) {
@@ -678,7 +680,7 @@ void BackgroundCommand::execute(){
     char *args[COMMAND_MAX_ARGS+1]= {NULL};
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum > 2 || argNum < 1) {
-        cerr << "smash error: bg: invalid arguments\n";
+        cerr << "smash error: bg: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
@@ -689,12 +691,12 @@ void BackgroundCommand::execute(){
             releaseArgsArray(args);
         } catch (...)
         {
-            cerr << "smash error: bg: invalid arguments\n";
+            cerr << "smash error: bg: invalid arguments" << endl;
             return;
         }
         if(jobId <= 0 || pJobEntry == nullptr)
         {
-            cerr << "smash error: bg: job-id "<< jobId <<" does not exist\n";
+            cerr << "smash error: bg: job-id "<< jobId <<" does not exist" << endl;
             return;
         }
         if(!pJobEntry->isStopped)
@@ -942,7 +944,6 @@ RedirectionCommand::RedirectionCommand(const char *cmd_line)
     }
     this->fileName = _trim(fileName);
 
-
 }
 
 bool RedirectionCommand::isRedirection(const char *cmd_line) {
@@ -971,8 +972,8 @@ void RedirectionCommand::prepare()
     }
 
     int resultClose = close(1);
-    if(resultClose < 0)
-    {
+    if(resultClose < 0) {
+        isFailed = true;
         perror("smash error: close failed");
         return;
     }
@@ -986,6 +987,7 @@ void RedirectionCommand::prepare()
     }
     if(outputFd < 0)
     {
+        isFailed = true;
         perror("smash error: open failed");
         return;
     }
@@ -1384,7 +1386,7 @@ void SetcoreCommand::execute() {
     JobsList::JobEntry* currentJob = jobsPointer->getJobById(jobId);
     if(currentJob == nullptr)
     {
-        cerr << "smash error: setcore: job-id "<< jobId << " does not exist\n";
+        cerr << "smash error: setcore: job-id "<< jobId << " does not exist" << endl;
         return;
     }
 
@@ -1399,7 +1401,7 @@ void SetcoreCommand::execute() {
         return;
     }
     if(coreId >= coresNum){
-        cerr << "smash error: setcore: invalid core number\n";
+        cerr << "smash error: setcore: invalid core number" << endl;
         return;
     }
 
@@ -1419,7 +1421,7 @@ void GetFileTypeCommand::execute()
     char *args[COMMAND_MAX_ARGS+1] = {NULL};
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if(argNum!=2) {
-        cerr << "smash error: gettype: invalid arguments\n";
+        cerr << "smash error: gettype: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
@@ -1450,7 +1452,7 @@ void GetFileTypeCommand::execute()
 
         long fileSize = fileStat.st_size;
 
-        cout << filename << "\'s type is \""<< fileType << "\" and takes up " << fileSize << " bytes\n";
+        cout << filename << "\'s type is \""<< fileType << "\" and takes up " << fileSize << " bytes" << endl;
 
     releaseArgsArray(args);
 
@@ -1465,7 +1467,7 @@ void ChmodCommand::execute() {
     char *args[COMMAND_MAX_ARGS+1] = {NULL};
     int argNum = _parseCommandLine(this->getCmdLine(), args);
     if (argNum != 3) {
-        cerr << "smash error: gettype: invalid arguments\n";
+        cerr << "smash error: gettype: invalid arguments" << endl;
         releaseArgsArray(args);
         return;
     }
@@ -1479,7 +1481,7 @@ void ChmodCommand::execute() {
 
     if (endptr == modeChar || errno == EINVAL || *endptr != '\0')
     {
-        cerr << "smash error: chmod: invalid arguments\n";
+        cerr << "smash error: chmod: invalid arguments" << endl;
         return;
     }
 
