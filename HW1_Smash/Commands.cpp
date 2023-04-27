@@ -849,11 +849,11 @@ void ExternalCommand::execute() {
             perror("smash error: setpgrp failed");
             exit(-1);
         }
-        int innerChildPid = getpid();
-        SmallShell &smash = SmallShell::getInstance();
-        if (isBackgroundCommand) {
-            smash.getJobsList()->addJob(this, innerChildPid, false);
-        }
+//        int innerChildPid = getpid();
+//        SmallShell &smash = SmallShell::getInstance();
+//        if (isBackgroundCommand) {
+//            smash.getJobsList()->addJob(this, innerChildPid, false);
+//        }
 
         if (this->isComplexCommand) {
             char *cFlag = (char *) "-c";
@@ -869,21 +869,6 @@ void ExternalCommand::execute() {
             }
         } else
         {
-//            char *path = getenv("PATH"); // Get the current value of the PATH environment variable
-//            if(path == NULL){
-//                perror("smash error: getenv failed");
-//                exit(-1);
-//            }
-//            char *new_path = new char[strlen(path) + 2 + 1]; // Allocate memory for a new string that includes the current directory
-//
-//            // Construct the new PATH environment variable string
-//            sprintf(new_path, ".:%s", path);
-//            if(setenv("PATH", new_path, 1) == -1) // Set the new PATH environment variable
-//            {
-//                perror("smash error: setenv failed");
-//                exit(-1);
-//            }
-//            delete[] new_path;
 
             int execv_res = execvp(argv[0], argv);
             if(execv_res == -1){
@@ -911,6 +896,7 @@ void ExternalCommand::execute() {
             smash.setCurrentFgPid(childPid);
             smash.setCurrentFgCommand(this->getCmdLine());
             int resultChild = waitpid(childPid, NULL, WUNTRACED);
+
             smash.setCurrentFgPid(-1);
             smash.setCurrentFgCommand("");
             if(resultChild == -1){
@@ -1537,7 +1523,8 @@ void TimeoutCommand::execute() {
             exit(-1);
         }
         this->processId = getpid();
-
+        if(command[command.size()-1] == '&')
+            command = command.substr(0, command.size()-1);
         smash.executeCommand(command.c_str());
         exit(1);
     }
@@ -1561,6 +1548,10 @@ void TimeoutCommand::execute() {
                 perror("smash error: waitpid failed");
                 return;
             }
+        }
+        else
+        {
+            smash.getJobsList()->addJob(this, childPid, false);
         }
     }
 }
