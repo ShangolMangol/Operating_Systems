@@ -702,6 +702,7 @@ void BackgroundCommand::execute(){
         if(!pJobEntry->isStopped)
         {
             cerr << "smash error: bg: job-id "<< jobId <<" is already running in the background" << endl;
+            return;
         }
     }
     else
@@ -960,6 +961,7 @@ void RedirectionCommand::prepare()
 {
     if(fileName.empty())
     {
+        isFailed = true;
         cerr << "smash error:> \"" << this->getCmdLine() << "\"" << endl;
         return;
     }
@@ -973,7 +975,7 @@ void RedirectionCommand::prepare()
 
     int resultClose = close(1);
     if(resultClose < 0) {
-        isFailed = true;
+        this->isFailed = true;
         perror("smash error: close failed");
         return;
     }
@@ -987,7 +989,7 @@ void RedirectionCommand::prepare()
     }
     if(outputFd < 0)
     {
-        isFailed = true;
+        this->isFailed = true;
         perror("smash error: open failed");
         return;
     }
@@ -1039,14 +1041,19 @@ void RedirectionCommand::execute()
 
 void RedirectionCommand::cleanup() {
 
-    if(close(1) == -1)
-    {
-        perror("smash error: close failed");
+    if(!isFailed){
+        if(close(1) == -1)
+        {
+            perror("smash error: close failed");
+            return;
+        }
+    }
+    if(stdoutTemp == -1){
         return;
     }
     if(dup2(stdoutTemp, 1) == -1)
     {
-        perror("smash error: close failed");
+        perror("smash error: dup2 failed");
         return;
     }
     if(close(stdoutTemp) == -1) {
