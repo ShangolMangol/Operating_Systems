@@ -1602,8 +1602,7 @@ void TimeoutCommand::execute() {
         this->processId = childPid;
         char* copy_str = new char[strlen(this->getCmdLine())]; // Allocate memory for the copy
         strcpy(copy_str, this->getCmdLine());
-        if(currentAlarm != 0 && currentAlarm < this->duration)
-        {
+        if(currentAlarm != 0 && currentAlarm < this->duration) {
             alarm(currentAlarm);
         }
         smash.insertTimeoutCommand(

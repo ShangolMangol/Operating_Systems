@@ -15,7 +15,7 @@ bool _isBackgroundCommand(const char* cmd_line) {
 }
 
 void ctrlZHandler(int sig_num) {
-    cout << "smash: got ctrl-Z\n";
+    cout << "smash: got ctrl-Z" << endl;
     SmallShell& smash = SmallShell::getInstance();
     int processToStop = smash.getCurrentFgPid();
     if(processToStop==-1)
@@ -27,14 +27,14 @@ void ctrlZHandler(int sig_num) {
     if (kill(processToStop, SIGSTOP) == -1) {
         perror("smash error: kill failed");
     }
-    cout << "smash: process " << processToStop << " was stopped\n";
+    cout << "smash: process " << processToStop << " was stopped" << endl;
 
     smash.setCurrentFgCommand("");
     smash.setCurrentFgPid(-1);
 }
 
 void ctrlCHandler(int sig_num) {
-    cout << "smash: got ctrl-C\n";
+    cout << "smash: got ctrl-C" << endl;
     SmallShell& smash = SmallShell::getInstance();
     int processToKill = smash.getCurrentFgPid();
     if(processToKill==-1){
@@ -43,13 +43,13 @@ void ctrlCHandler(int sig_num) {
     if(kill(processToKill, SIGKILL) == -1){
         perror("smash error: kill failed");
     }
-    cout << "smash: process " << processToKill << " was killed\n";
+    cout << "smash: process " << processToKill << " was killed" << endl;
     smash.setCurrentFgCommand("");
     smash.setCurrentFgPid(-1);
 }
 
 void alarmHandler(int sig_num) {
-    cout << "smash: got an alarm\n";
+    cout << "smash: got an alarm" << endl;
     SmallShell& smash = SmallShell::getInstance();
     smash.getJobsList()->removeFinishedJobs();
 
