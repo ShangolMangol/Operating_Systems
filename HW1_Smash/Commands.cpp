@@ -522,7 +522,7 @@ void JobsList::removeFinishedJobs()
     for(int finishedPid : jobsToDelete)
     {
         smash.removeTimeoutByPid(finishedPid);
-        smash.scheduleTimeoutAlarm();
+//        smash.scheduleTimeoutAlarm();
         for(auto job = allJobs.begin(); job< allJobs.end(); job++)
         {
             if(finishedPid == (*job)->processId)
@@ -620,6 +620,16 @@ void JobsList::updateMaxId() {
         }
     }
     this->maxJobIdAvailable = maxJobId;
+}
+
+JobsList::JobEntry *JobsList::getJobByPid(int pid)
+{
+    for(JobEntry* jobEntry : allJobs)
+    {
+        if(jobEntry->processId == pid)
+            return jobEntry;
+    }
+    return nullptr;
 }
 
 JobsList::JobEntry::JobEntry(int job, std::string command, int pid, bool isStopped)
@@ -904,6 +914,22 @@ void ExternalCommand::execute() {
             }
         } else
         {
+
+            char *path = getenv("PATH"); // Get the current value of the PATH environment variable
+            if(path == NULL){
+                perror("smash error: getenv failed");
+                exit(-1);
+            }
+            char *new_path = new char[strlen(path) + 2 + 1]; // Allocate memory for a new string that includes the current directory
+
+            // Construct the new PATH environment variable string
+            sprintf(new_path, ".:%s", path);
+            if(setenv("PATH", new_path, 1) == -1) // Set the new PATH environment variable
+            {
+                perror("smash error: setenv failed");
+                exit(-1);
+            }
+            delete[] new_path;
 
             int execv_res = execvp(argv[0], argv);
             if(execv_res == -1){
@@ -1424,7 +1450,7 @@ void SetcoreCommand::execute() {
     long coresNum = sysconf(_SC_NPROCESSORS_ONLN);
     if(coresNum == -1)
     {
-        perror("smash error: sched_setaffinity failed");
+        perror("smash error: sysconf failed");
         return;
     }
     if(coreId >= coresNum){
@@ -1590,8 +1616,8 @@ void TimeoutCommand::execute() {
             int waitPid_res = waitpid(childPid, NULL, WUNTRACED);
             smash.setCurrentFgPid(-1);
             smash.setCurrentFgCommand("");
-            smash.removeTimeoutByPid(childPid);
-            smash.scheduleTimeoutAlarm();
+//            smash.removeTimeoutByPid(childPid);
+//            smash.scheduleTimeoutAlarm();
             if (waitPid_res == -1) {
                 perror("smash error: waitpid failed");
                 return;
@@ -1599,7 +1625,10 @@ void TimeoutCommand::execute() {
         }
         else
         {
-            smash.getJobsList()->addJob(this, childPid, false);
+            char* copy_str2 = new char[strlen(copy_str)]; // Allocate memory for the copy
+            strcpy(copy_str2, copy_str);
+            smash.getJobsList()->addJob(new TimeoutCommand(copy_str2, childPid, this->startTime,
+                                                           this->expectedEnd, this->duration), childPid, false);
         }
     }
 }

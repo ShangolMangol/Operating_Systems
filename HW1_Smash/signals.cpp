@@ -6,6 +6,13 @@
 
 using namespace std;
 
+const std::string WHITESPACE = " \n\r\t\f\v";
+
+
+bool _isBackgroundCommand(const char* cmd_line) {
+    const string str(cmd_line);
+    return str[str.find_last_not_of(WHITESPACE)] == '&';
+}
 
 void ctrlZHandler(int sig_num) {
     cout << "smash: got ctrl-Z\n";
@@ -44,16 +51,26 @@ void ctrlCHandler(int sig_num) {
 void alarmHandler(int sig_num) {
     cout << "smash: got an alarm\n";
     SmallShell& smash = SmallShell::getInstance();
+    smash.getJobsList()->removeFinishedJobs();
 
     TimeoutCommand* topTimeout = smash.topTimeoutCommand();
+//        int pid;
+
     int currentEnd = topTimeout->getExpectedEnd();
 
     while (!smash.isTimeoutQueueEmpty() && currentEnd == smash.topTimeoutCommand()->getExpectedEnd())
     {
-        if(kill(smash.topTimeoutCommand()->getProcessId(), SIGKILL) == -1){
-            perror("smash error: kill failed");
+        int isExist = kill(topTimeout->getProcessId(), 0);
+        topTimeout = smash.topTimeoutCommand();
+//            pid = topTimeout->getProcessId();
+        // if(!_isBackgroundCommand(topTimeout->getCmdLine()) || smash.getJobsList()->getJobByPid(pid) != nullptr)
+        if(isExist == 0)
+        {
+            if(kill(smash.topTimeoutCommand()->getProcessId(), SIGKILL) == -1) {
+                perror("smash error: kill failed");
+            }
+            cout << "smash: " << topTimeout->getCmdLine() << " timed out!" << endl;
         }
-        cout << "smash: " << smash.topTimeoutCommand()->getCmdLine() << " timed out!\n";
         smash.popTimeoutCommand();
     }
 
