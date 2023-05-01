@@ -60,8 +60,8 @@ void alarmHandler(int sig_num) {
 
     while (!smash.isTimeoutQueueEmpty() && currentEnd == smash.topTimeoutCommand()->getExpectedEnd())
     {
-        int isExist = kill(topTimeout->getProcessId(), 0);
         topTimeout = smash.topTimeoutCommand();
+        int isExist = kill(topTimeout->getProcessId(), 0);
 //            pid = topTimeout->getProcessId();
         // if(!_isBackgroundCommand(topTimeout->getCmdLine()) || smash.getJobsList()->getJobByPid(pid) != nullptr)
         if(isExist == 0)
