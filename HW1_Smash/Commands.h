@@ -249,11 +249,11 @@ class SmallShell {
   std::string promptStr;
   char* lastPwd;
   JobsList jobsList;
-  static int smashPid;
   int currentFgPid;
   std::string currentFgCommand;
   std::priority_queue<TimeoutCommand*, std::vector<TimeoutCommand*>, CompareTimeout> timeoutQueue;
 public:
+    static int smashPid;
     std::priority_queue<TimeoutCommand *, std::vector<TimeoutCommand *>, CompareTimeout> &getTimeoutQueue();
     void insertTimeoutCommand(TimeoutCommand* cmd);
     bool isTimeoutQueueEmpty() const;

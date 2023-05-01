@@ -822,7 +822,7 @@ void KillCommand::execute()
         return;
     }
 
-    if(sigNum < 1 || sigNum > 31)
+    if(sigNum < 0 || sigNum > 31)
     {
         cerr << "smash error: kill: invalid arguments" << endl;
         return;
@@ -890,9 +890,11 @@ void ExternalCommand::execute() {
     }
     else if(childPid == 0) //child
     {
-        if (setpgrp() == -1) {
-            perror("smash error: setpgrp failed");
-            exit(-1);
+        if(getppid() == SmallShell::smashPid) {
+            if (setpgrp() == -1) {
+                perror("smash error: setpgrp failed");
+                exit(-1);
+            }
         }
 //        int innerChildPid = getpid();
 //        SmallShell &smash = SmallShell::getInstance();
@@ -1612,7 +1614,7 @@ void TimeoutCommand::execute() {
         {
             smash.setCurrentFgPid(childPid);
             smash.setCurrentFgCommand(this->getCmdLine());
-            int waitPid_res = waitpid(childPid, NULL, WUNTRACED);
+            int waitPid_res = waitpid(childPid, NULL, 0);
             smash.setCurrentFgPid(-1);
             smash.setCurrentFgCommand("");
 //            smash.removeTimeoutByPid(childPid);

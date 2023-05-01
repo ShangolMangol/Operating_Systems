@@ -13,7 +13,7 @@ test: $(TESTS_OUTPUTS)
 
 $(TESTS_OUTPUTS): $(SMASH_BIN)
 $(TESTS_OUTPUTS): test_output%.txt: test_input%.txt test_expected_output%.txt
-	#./$(SMASH_BIN) < $(word 1, $^) > $@
+#	./$(SMASH_BIN) < $(word 1, $^) > $@
 #	diff $@ $(word 2, $^)
 #	echo $(word 1, $^) ++PASSED++
 

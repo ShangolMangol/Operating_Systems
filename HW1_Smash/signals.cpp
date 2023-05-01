@@ -66,7 +66,7 @@ void alarmHandler(int sig_num) {
         // if(!_isBackgroundCommand(topTimeout->getCmdLine()) || smash.getJobsList()->getJobByPid(pid) != nullptr)
         if(isExist == 0)
         {
-            if(kill(smash.topTimeoutCommand()->getProcessId(), SIGKILL) == -1) {
+            if(killpg(smash.topTimeoutCommand()->getProcessId(), SIGKILL) == -1) {
                 perror("smash error: kill failed");
             }
             cout << "smash: " << topTimeout->getCmdLine() << " timed out!" << endl;
