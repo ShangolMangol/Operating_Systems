@@ -822,11 +822,11 @@ void KillCommand::execute()
         return;
     }
 
-    if(sigNum < 0 || sigNum > 31)
-    {
-        cerr << "smash error: kill: invalid arguments" << endl;
-        return;
-    }
+//    if(sigNum < 0 || sigNum > 31)
+//    {
+//        cerr << "smash error: kill: invalid arguments" << endl;
+//        return;
+//    }
 
     JobsList::JobEntry * pJobEntry= jobsPointer->getJobById(jobId);
     if(pJobEntry == nullptr) {
