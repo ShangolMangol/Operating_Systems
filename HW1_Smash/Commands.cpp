@@ -1485,7 +1485,7 @@ void GetFileTypeCommand::execute()
         string filename = string(args[1]);
         struct stat fileStat;
 
-        if (stat(filename.c_str(), &fileStat) == -1) {
+        if (lstat(filename.c_str(), &fileStat) == -1) {
             perror("smash error: stat failed");
             return;
         }

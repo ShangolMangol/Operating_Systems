@@ -1,5 +1,5 @@
 #TODO: replace ID with your own IDS, for example: 123456789_123456789
-SUBMITTERS := <student1-ID>_<student2-ID>
+SUBMITTERS := 214008997_213745953
 COMPILER := g++
 COMPILER_FLAGS := --std=c++11 -Wall
 SRCS := Commands.cpp signals.cpp smash.cpp
@@ -13,9 +13,9 @@ test: $(TESTS_OUTPUTS)
 
 $(TESTS_OUTPUTS): $(SMASH_BIN)
 $(TESTS_OUTPUTS): test_output%.txt: test_input%.txt test_expected_output%.txt
-#	./$(SMASH_BIN) < $(word 1, $^) > $@
-#	diff $@ $(word 2, $^)
-#	echo $(word 1, $^) ++PASSED++
+	./$(SMASH_BIN) < $(word 1, $^) > $@
+	diff $@ $(word 2, $^)
+	echo $(word 1, $^) ++PASSED++
 
 $(SMASH_BIN): $(OBJS)
 	$(COMPILER) $(COMPILER_FLAGS) $^ -o $@
