@@ -1,13 +1,14 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
-
+#include <linux/list.h>
+#include <linux/module.h>
 
 asmlinkage long sys_hello(void) {
     printk("Hello, World!\n");
     return 0;
 }
 
-asmlinkage int sys_set_weight(int weight)
+asmlinkage long sys_set_weight(int weight)
 {
     if(weight < 0)
     {
@@ -17,12 +18,12 @@ asmlinkage int sys_set_weight(int weight)
     return 0;
 }
 
-asmlinkage int sys_get_weight(void)
+asmlinkage long sys_get_weight(void)
 {
     return current->weight;
 }
 
-asmlinkage int sys_get_ancestor_sum(void)
+asmlinkage long sys_get_ancestor_sum(void)
 {
     int sum = 0;
     struct task_struct *curr = current;
@@ -58,7 +59,7 @@ struct task_struct* get_heaviest_descendant(struct task_struct* currentProcess)
     return maxTask;
 }
 
-asmlinkage pid_t sys_get_heaviest_descendant(void)
+asmlinkage long sys_get_heaviest_descendant(void)
 {
     if(list_empty(&current->children)){
         return -ECHILD;
