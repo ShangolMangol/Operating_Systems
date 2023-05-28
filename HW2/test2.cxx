@@ -45,7 +45,7 @@ int main() {
         while (1);
     }
     sleep(2);
-    
+
     pid_t y = get_heaviest_descendant();
     cout << "child pid: " << child_pid << endl;
     cout << "heaviest descendant: " << y << endl;
