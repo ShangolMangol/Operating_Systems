@@ -1,6 +1,15 @@
 #include "segel.h"
 #include "request.h"
 
+
+#define BLOCK 1
+#define DROP_TAIL 2
+#define DROP_HEAD 3
+#define BLOCK_FLUSH 4
+#define DYNAMIC 5
+#define DROP_RANDOM 6
+
+
 //
 // server.c: A very, very simple web server
 //
@@ -14,8 +23,9 @@
 
 pthread_mutex_t waiting_mutex;
 pthread_mutex_t running_mutex;
-pthread_cond_t cond;
-
+pthread_cond_t thread_cond;
+pthread_cond_t wait_master_cond;
+pthread_mutex_t master_mutex;
 
 //** queue functions **/
 typedef struct Node{
@@ -134,7 +144,7 @@ void* parse_routine(void* arg)
     {
 
         while(waiting_queue.size == 0){
-            pthread_cond_wait(&cond, &waiting_mutex);
+            pthread_cond_wait(&thread_cond, &waiting_mutex);
         }
 
         int connectionFd;
@@ -147,20 +157,16 @@ void* parse_routine(void* arg)
 //        printf("passed requestHandle\n");
         remove_by_fd(&running_queue, connectionFd, &running_mutex);
 //        printf("passed: remove_by_id\n");
-        close(connectionFd);
+        Close(connectionFd);
 //        printf("passed: close\n");
 
 
-//        currentRequest = pop_from_queue(&waiting);
-//        add_to_queue(&running);
-//        requestHandle(currentRequest);
-//        remove_by_fd(&running, currentRequest);
     }
 }
 
 
 // HW3: Parse the new arguments too
-void getargs(int *port, int* threadsNum, int* queueSize, int argc, char *argv[])
+void getargs(int *port, int* threadsNum, int* queueSize, int* schedAlg, int argc, char *argv[], maxSize=-1)
 {
     if (argc < 2)
     {
@@ -170,7 +176,30 @@ void getargs(int *port, int* threadsNum, int* queueSize, int argc, char *argv[])
     *port = atoi(argv[1]);
     *threadsNum = atoi(argv[2]);
     *queueSize = atoi(argv[3]);
+    char *schedAlgStr = argv[4];
+    if(argc>5){
+        *maxSize = argv[5];
+    }
+    if(strcmp(schedAlgStr, "block")==0){
+        *schedAlg = BLOCK;
+    }
+    else if(strcmp(schedAlgStr, "dt") == 0){
+        *schedAlg = DROP_TAIL;
+    }
+    else if(strcmp(schedAlgStr, "dh") == 0){
+        *schedAlg = DROP_HEAD;
+    }
+    else if(strcmp(schedAlgStr, "bf") == 0){
+        *schedAlg = BLOCK_FLUSH;
+    }
+    else if(strcmp(schedAlgStr, "dynamic") == 0){
+        *schedAlg = DYNAMIC;
+    }
+    else if(strcmp(schedAlgStr, "random") == 0){
+        *schedAlg = DROP_RANDOM;
+    }
 }
+
 
 
 int main(int argc, char *argv[])
@@ -178,19 +207,22 @@ int main(int argc, char *argv[])
     int listenfd, connfd, port, clientlen;
     struct sockaddr_in clientaddr;
 
-    int threadsNum, queueSize;
-    getargs(&port, &threadsNum, &queueSize, argc, argv);
+    int threadsNum, queueSize, schedAlg, maxSize;
+    getargs(&port, &threadsNum, &queueSize, &schedAlg, argc, argv, &maxSize);
 
     //
     // HW3: Create some threads...
     //
 
-    pthread_cond_init(&cond, NULL);
+    pthread_cond_init(&thread_cond, NULL);
+    pthread_cond_init(&thread_cond, NULL);
     setup_queue(&running_queue);
     setup_queue(&waiting_queue);
 
     pthread_mutex_init(&waiting_mutex, NULL);
     pthread_mutex_init(&running_mutex, NULL);
+    pthread_mutex_init(&master_mutex, NULL);
+
     pthread_t* threadsPool = (pthread_t *) malloc(threadsNum * sizeof(pthread_t));
     for (int i = 0; i < threadsNum; ++i)
     {
@@ -201,13 +233,55 @@ int main(int argc, char *argv[])
     while (1)
     {
         clientlen = sizeof(clientaddr);
-        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
 
-        enqueue_rear(&waiting_queue, connfd ,&waiting_mutex);
-
-        if(running_queue.size <= threadsNum)
+        pthread_mutex_lock(&running_mutex);
+        pthread_mutex_lock(&waiting_mutex);
+        if(running_queue.size + waiting_queue.size < queueSize)
         {
-            pthread_cond_signal(&cond);
+            pthread_mutex_unlock(&running_mutex);
+            pthread_mutex_unlock(&waiting_mutex);
+            connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+
+            enqueue_rear(&waiting_queue, connfd, &waiting_mutex);
+
+            if (running_queue.size <= threadsNum) {
+                pthread_cond_signal(&thread_cond);
+            }
+        }
+        else
+        {
+            if(schedAlg == BLOCK)
+            {
+                pthread_mutex_lock(&master_mutex);
+                pthread_cond_wait(&wait_master_cond, &master_mutex);
+
+                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+
+                enqueue_rear(&waiting_queue, connfd, &waiting_mutex);
+
+                if (running_queue.size <= threadsNum) {
+                    pthread_cond_signal(&thread_cond);
+                }
+
+                pthread_mutex_unlock(&master_mutex);
+
+            } else if(schedAlg == DROP_TAIL)
+            {
+                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+                Close(connfd);
+            } else if(schedAlg == DROP_HEAD)
+            {
+
+            } else if(schedAlg == BLOCK_FLUSH)
+            {
+
+            } else if(schedAlg == DYNAMIC)
+            {
+
+            } else if(schedAlg == DROP_RANDOM)
+            {
+
+            }
         }
 
         //
@@ -216,9 +290,7 @@ int main(int argc, char *argv[])
         // do the work.
         //
 
-    //	requestHandle(connfd);
 
-    //	Close(connfd);
     }
 
 }
