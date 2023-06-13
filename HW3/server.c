@@ -26,7 +26,6 @@
 pthread_mutex_t queue_mutex;
 pthread_cond_t thread_cond;
 pthread_cond_t wait_master_cond;
-pthread_mutex_t master_mutex;
 pthread_cond_t empty_queue_cond;
 int schedAlg;
 
@@ -249,7 +248,7 @@ int main(int argc, char *argv[]) {
     pthread_mutex_init(&queue_mutex, NULL);
 //    pthread_mutex_init(&waiting_mutex, NULL);
 //    pthread_mutex_init(&running_mutex, NULL);
-    pthread_mutex_init(&master_mutex, NULL);
+  //  pthread_mutex_init(&master_mutex, NULL);
 
     pthread_t *threadsPool = (pthread_t *) malloc(threadsNum * sizeof(pthread_t));
     for (int i = 0; i < threadsNum; ++i) {
@@ -261,15 +260,11 @@ int main(int argc, char *argv[]) {
     while (1) {
         clientlen = sizeof(clientaddr);
 
-        if(!(schedAlg == BLOCK_FLUSH || schedAlg == BLOCK))
-            connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+        connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
 
         pthread_mutex_lock(&queue_mutex);
         if (running_queue.size + waiting_queue.size < queueSize) {
 //            pthread_mutex_unlock(&queue_mutex);
-
-            if(schedAlg == BLOCK_FLUSH || schedAlg == BLOCK)
-                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
 
 //            pthread_mutex_lock(&queue_mutex);
 
@@ -285,13 +280,9 @@ int main(int argc, char *argv[]) {
         } else {
             if (schedAlg == BLOCK) {
 //                printf("in block\n");
-                pthread_mutex_unlock(&queue_mutex);
-                pthread_mutex_lock(&master_mutex);
-                pthread_cond_wait(&wait_master_cond, &master_mutex);
 
-                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+                pthread_cond_wait(&wait_master_cond, &queue_mutex);
 
-                pthread_mutex_lock(&queue_mutex);
 
                 enqueue_rear(&waiting_queue, connfd);
 
@@ -301,23 +292,17 @@ int main(int argc, char *argv[]) {
 
                 pthread_mutex_unlock(&queue_mutex);
 
-                pthread_mutex_unlock(&master_mutex);
 
             } else if (schedAlg == DROP_TAIL) {
-                pthread_mutex_unlock(&queue_mutex);
-//                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
                 Close(connfd);
+                pthread_mutex_unlock(&queue_mutex);
 
             } else if (schedAlg == DROP_HEAD) {
-//                pthread_mutex_lock(&queue_mutex);
+
                 dequeue_front(&waiting_queue, &tempRes);
                 if(tempRes != -1)
                     Close(tempRes);
-//                pthread_mutex_unlock(&queue_mutex);
 
-//                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
-
-//                pthread_mutex_lock(&queue_mutex);
                 enqueue_rear(&waiting_queue, connfd);
 
                 if (running_queue.size < threadsNum) {
@@ -327,14 +312,8 @@ int main(int argc, char *argv[]) {
                 pthread_mutex_unlock(&queue_mutex);
 
             } else if (schedAlg == BLOCK_FLUSH) {
-                pthread_mutex_unlock(&queue_mutex);
-                pthread_mutex_lock(&master_mutex);
-                pthread_cond_wait(&wait_master_cond, &master_mutex);
 
-
-                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
-
-                pthread_mutex_lock(&queue_mutex);
+                pthread_cond_wait(&wait_master_cond, &queue_mutex);
 
                 enqueue_rear(&waiting_queue, connfd);
 
@@ -344,15 +323,14 @@ int main(int argc, char *argv[]) {
 
                 pthread_mutex_unlock(&queue_mutex);
 
-                pthread_mutex_unlock(&master_mutex);
 
             } else if (schedAlg == DYNAMIC) {
-                pthread_mutex_unlock(&queue_mutex);
                 if (queueSize + 1 <= maxSize) {
                     queueSize++;
                 }
-//                connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
                 Close(connfd);
+                pthread_mutex_unlock(&queue_mutex);
+
 
             } else if (schedAlg == DROP_RANDOM) {
                 int taskToDrop;
