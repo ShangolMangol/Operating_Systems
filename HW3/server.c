@@ -32,6 +32,7 @@ int schedAlg;
 //** queue functions **/
 typedef struct Node{
     int fd;
+    struct timeval arrival_time;
     struct Node* next;
 } Node;
 
@@ -44,6 +45,7 @@ typedef struct Queue {
 void setup_Node(Node* node, int fd1)
 {
     node->fd = fd1;
+
     node->next = NULL;
 }
 
@@ -80,12 +82,36 @@ void enqueue_rear(Queue* queue, int fd){
 }
 
 
-void dequeue_front(Queue* queue, int* result){
+void enqueue_rear_start(Queue* queue, int fd, struct timeval time){
+    Node* node = (Node*)malloc (sizeof(Node));
+    setup_Node(node, fd);
+    if(queue != &running_queue)
+    {
+        node->arrival_time = time;
+    }
+    if(queue->size == 0)
+    {
+        queue->front = node;
+        queue->rear = node;
+    }
+    else
+    {
+        (queue->rear)->next = node;
+        queue->rear = node;
+    }
+    (queue->size)++;
+}
+
+
+void dequeue_front(Queue* queue, int* result, struct timeval* time){
     Node* frontNode = NULL;
     *result = -1;
     if(queue->size > 0)
     {
         frontNode = queue->front;
+        if(time != NULL) {
+            *time = frontNode->arrival_time;
+        }
         queue->front = (queue->front)->next;
         (queue->size)--;
         *result = frontNode->fd;
@@ -147,6 +173,7 @@ void remove_by_index(Queue* queue, int index)
 
 void* parse_routine(void* arg)
 {
+    int threadId = *((int *) arg);
     while(1)
     {
         pthread_mutex_lock(&queue_mutex);
@@ -156,13 +183,19 @@ void* parse_routine(void* arg)
 
         int connectionFd;
 
-        dequeue_front(&waiting_queue, &connectionFd);
+        struct timeval arrivalTime;
+        dequeue_front(&waiting_queue, &connectionFd, &arrivalTime);
 
         enqueue_rear(&running_queue, connectionFd);
 
         pthread_mutex_unlock(&queue_mutex);
 
-        requestHandle(connectionFd);
+        struct timeval pickupTime;
+        struct timeval dispatchTime;
+        gettimeofday(&pickupTime, NULL);
+
+        timersub(&pickupTime, &arrivalTime, &dispatchTime);
+        requestHandle(connectionFd, arrivalTime, dispatchTime, threadId);
 
         pthread_mutex_lock(&queue_mutex);
         remove_by_fd(&running_queue, connectionFd);
@@ -250,17 +283,22 @@ int main(int argc, char *argv[]) {
 //    pthread_mutex_init(&running_mutex, NULL);
   //  pthread_mutex_init(&master_mutex, NULL);
 
+    int *indexArr = (int *) malloc(threadsNum* sizeof(int));
     pthread_t *threadsPool = (pthread_t *) malloc(threadsNum * sizeof(pthread_t));
     for (int i = 0; i < threadsNum; ++i) {
-        pthread_create(&(threadsPool[i]), NULL, parse_routine, NULL);
+        indexArr[i] = i;
+        pthread_create(&(threadsPool[i]), NULL, parse_routine, (void*)(&indexArr[i]) );
     }
 
     int tempRes;
     listenfd = Open_listenfd(port);
+    struct timeval currTime;
+
     while (1) {
         clientlen = sizeof(clientaddr);
 
         connfd = Accept(listenfd, (SA *) &clientaddr, (socklen_t * ) & clientlen);
+        gettimeofday(&currTime, NULL);
 
         pthread_mutex_lock(&queue_mutex);
         if (running_queue.size + waiting_queue.size < queueSize) {
@@ -268,7 +306,7 @@ int main(int argc, char *argv[]) {
 
 //            pthread_mutex_lock(&queue_mutex);
 
-            enqueue_rear(&waiting_queue, connfd);
+            enqueue_rear_start(&waiting_queue, connfd, currTime);
 
             if (running_queue.size < threadsNum) {
                 pthread_cond_signal(&thread_cond);
@@ -284,7 +322,7 @@ int main(int argc, char *argv[]) {
                 pthread_cond_wait(&wait_master_cond, &queue_mutex);
 
 
-                enqueue_rear(&waiting_queue, connfd);
+                enqueue_rear_start(&waiting_queue, connfd, currTime);
 
                 if (running_queue.size < threadsNum) {
                     pthread_cond_signal(&thread_cond);
@@ -299,11 +337,11 @@ int main(int argc, char *argv[]) {
 
             } else if (schedAlg == DROP_HEAD) {
 
-                dequeue_front(&waiting_queue, &tempRes);
+                dequeue_front(&waiting_queue, &tempRes, NULL);
                 if(tempRes != -1)
                     Close(tempRes);
 
-                enqueue_rear(&waiting_queue, connfd);
+                enqueue_rear_start(&waiting_queue, connfd, currTime);
 
                 if (running_queue.size < threadsNum) {
                     pthread_cond_signal(&thread_cond);
@@ -315,7 +353,7 @@ int main(int argc, char *argv[]) {
 
                 pthread_cond_wait(&wait_master_cond, &queue_mutex);
 
-                enqueue_rear(&waiting_queue, connfd);
+                enqueue_rear_start(&waiting_queue, connfd, currTime);
 
                 if (running_queue.size < threadsNum) {
                     pthread_cond_signal(&thread_cond);
@@ -339,7 +377,7 @@ int main(int argc, char *argv[]) {
                     taskToDrop = rand() % waiting_queue.size;
                     remove_by_index(&waiting_queue, taskToDrop);
                 }
-                enqueue_rear(&waiting_queue, connfd);
+                enqueue_rear_start(&waiting_queue, connfd, currTime);
                 pthread_mutex_unlock(&queue_mutex);
             }
         }
