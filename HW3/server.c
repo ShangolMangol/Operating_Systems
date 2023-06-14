@@ -29,6 +29,7 @@ pthread_cond_t wait_master_cond;
 pthread_cond_t empty_queue_cond;
 int schedAlg;
 
+
 //** queue functions **/
 typedef struct Node{
     int fd;
@@ -49,7 +50,12 @@ void setup_Node(Node* node, int fd1)
     node->next = NULL;
 }
 
-
+void set_up_stat(stat_data* thread_stat, int thread_id){
+    thread_stat->threadId = thread_id;
+    thread_stat->jobCount = 0;
+    thread_stat->staticJobCount = 0;
+    thread_stat->dynamicJobCount = 0;
+}
 struct Queue waiting_queue;
 struct Queue running_queue;
 void remove_by_index(struct Queue* queue, int index);
@@ -173,7 +179,7 @@ void remove_by_index(Queue* queue, int index)
 
 void* parse_routine(void* arg)
 {
-    int threadId = *((int *) arg);
+    struct stat_data* threadData = (stat_data*) arg;
     while(1)
     {
         pthread_mutex_lock(&queue_mutex);
@@ -195,7 +201,7 @@ void* parse_routine(void* arg)
         gettimeofday(&pickupTime, NULL);
 
         timersub(&pickupTime, &arrivalTime, &dispatchTime);
-        requestHandle(connectionFd, arrivalTime, dispatchTime, threadId);
+        requestHandle(connectionFd, arrivalTime, dispatchTime, threadData);
 
         pthread_mutex_lock(&queue_mutex);
         remove_by_fd(&running_queue, connectionFd);
@@ -283,14 +289,15 @@ int main(int argc, char *argv[]) {
 //    pthread_mutex_init(&running_mutex, NULL);
   //  pthread_mutex_init(&master_mutex, NULL);
 
-    int *indexArr = (int *) malloc(threadsNum* sizeof(int));
+    stat_data *threadStats = (stat_data*) malloc(threadsNum * sizeof(stat_data));
+//    int *indexArr = (int *) malloc(threadsNum* sizeof(int));
     pthread_t *threadsPool = (pthread_t *) malloc(threadsNum * sizeof(pthread_t));
     for (int i = 0; i < threadsNum; ++i) {
-        indexArr[i] = i;
-        pthread_create(&(threadsPool[i]), NULL, parse_routine, (void*)(&indexArr[i]) );
+//        indexArr[i] = i;
+        set_up_stat(&(threadStats[i]), i);
+        pthread_create(&(threadsPool[i]), NULL, parse_routine, (void*)(&(threadStats[i])) );
     }
 
-    int tempRes;
     listenfd = Open_listenfd(port);
     struct timeval currTime;
 
@@ -336,7 +343,7 @@ int main(int argc, char *argv[]) {
                 pthread_mutex_unlock(&queue_mutex);
 
             } else if (schedAlg == DROP_HEAD) {
-
+                int tempRes;
                 dequeue_front(&waiting_queue, &tempRes, NULL);
                 if(tempRes != -1)
                     Close(tempRes);
