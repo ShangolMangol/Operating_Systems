@@ -119,6 +119,9 @@ void dequeue_front(Queue* queue, int* result, struct timeval* time){
             *time = frontNode->arrival_time;
         }
         queue->front = (queue->front)->next;
+	if(queue->front == NULL){
+		queue->rear = NULL;
+	}
         (queue->size)--;
         *result = frontNode->fd;
     }
