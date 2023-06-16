@@ -177,8 +177,9 @@ void remove_by_index(Queue* queue, int index)
     {
         toDelete = toDelete->next;
     }
-    remove_by_fd(queue, (toDelete->fd));
-    Close(toDelete->fd);
+    int closeId = toDelete->fd;
+    remove_by_fd(queue, closeId);
+    Close(closeId);
 }
 
 void* parse_routine(void* arg)
@@ -382,7 +383,7 @@ int main(int argc, char *argv[]) {
 
             } else if (schedAlg == DROP_RANDOM) {
                 int taskToDrop;
-                int dropSize = waiting_queue.size / 2 + waiting_queue.size % 2;
+                int dropSize = (waiting_queue.size + 1) / 2;
                 for (int i = 0; i < dropSize; i++) {
                     taskToDrop = rand() % waiting_queue.size;
                     remove_by_index(&waiting_queue, taskToDrop);
