@@ -178,6 +178,7 @@ void remove_by_index(Queue* queue, int index)
         toDelete = toDelete->next;
     }
     remove_by_fd(queue, (toDelete->fd));
+    Close(toDelete->fd);
 }
 
 void* parse_routine(void* arg)
@@ -205,12 +206,11 @@ void* parse_routine(void* arg)
 
         timersub(&pickupTime, &arrivalTime, &dispatchTime);
         requestHandle(connectionFd, arrivalTime, dispatchTime, threadData);
-
+        Close(connectionFd);
         pthread_mutex_lock(&queue_mutex);
         remove_by_fd(&running_queue, connectionFd);
         pthread_mutex_unlock(&queue_mutex);
 
-        Close(connectionFd);
 
         if(schedAlg == BLOCK)
         {
@@ -363,11 +363,11 @@ int main(int argc, char *argv[]) {
 
                 pthread_cond_wait(&wait_master_cond, &queue_mutex);
 
-                enqueue_rear_start(&waiting_queue, connfd, currTime);
-
-                if (running_queue.size < threadsNum) {
-                    pthread_cond_signal(&thread_cond);
-                }
+//                enqueue_rear_start(&waiting_queue, connfd, currTime);
+                Close(connfd);
+//                if (running_queue.size < threadsNum) {
+//                    pthread_cond_signal(&thread_cond);
+//                }
 
                 pthread_mutex_unlock(&queue_mutex);
 
