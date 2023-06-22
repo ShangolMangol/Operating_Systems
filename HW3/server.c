@@ -119,9 +119,9 @@ void dequeue_front(Queue* queue, int* result, struct timeval* time){
             *time = frontNode->arrival_time;
         }
         queue->front = (queue->front)->next;
-	if(queue->front == NULL){
-		queue->rear = NULL;
-	}
+        if(queue->front == NULL){
+            queue->rear = NULL;
+        }
         (queue->size)--;
         *result = frontNode->fd;
     }
@@ -129,42 +129,75 @@ void dequeue_front(Queue* queue, int* result, struct timeval* time){
         free(frontNode);
 }
 
-void remove_by_fd(struct Queue* queue, int fd)
+void remove_by_fd(Queue* queue, int fd)
 {
-    Node* temp_node = queue->front;
-    Node* prev_node = NULL;
+    Node* current = queue->front;
+    Node* prev = NULL;
 
-    while(temp_node!=NULL)
-    {
-        if(temp_node->fd == fd)
-        {
-            if(prev_node == NULL)
-            {
-                queue->front = temp_node->next;
-                if(queue->front == NULL)
-                {
+    while (current != NULL) {
+        if (current->fd == fd) {
+            if (prev == NULL) {
+                queue->front = current->next;
+                if (queue->front == NULL) {
                     queue->rear = NULL;
                 }
-            }
-            else
-            {
-                prev_node->next = temp_node->next;
-                if (temp_node == queue->rear) {
-                    queue->rear = prev_node;
+            } else {
+                prev->next = current->next;
+                if (current == queue->rear) {
+                    queue->rear = prev;
                 }
-
             }
-            free(temp_node);
+            free(current);
             (queue->size)--;
             break;
-        }
-        else
-        {
-            prev_node = temp_node;
-            temp_node = temp_node->next;
+        } else {
+            prev = current;
+            current = current->next;
         }
     }
 }
+
+
+
+
+
+
+
+
+
+//    Node* temp_node = queue->front;
+//    Node* prev_node = NULL;
+//
+//    while(temp_node != NULL)
+//    {
+//        if(temp_node->fd == fd)
+//        {
+//            if(prev_node == NULL)
+//            {
+//                queue->front = temp_node->next;
+//            }
+//            else
+//            {
+//                prev_node->next = temp_node->next;
+//            }
+//            if(queue->front == NULL)
+//            {
+//                queue->rear = NULL;
+//            }
+//            if(queue->rear == temp_node)
+//            {
+//                queue->rear = prev_node;
+//            }
+//            free(temp_node);
+//            return;
+//        }
+//        else
+//        {
+//            prev_node = temp_node;
+//            temp_node = temp_node->next;
+//        }
+//    }
+//}
 
 
 void remove_by_index(Queue* queue, int index)
@@ -208,6 +241,7 @@ void* parse_routine(void* arg)
         timersub(&pickupTime, &arrivalTime, &dispatchTime);
         requestHandle(connectionFd, arrivalTime, dispatchTime, threadData);
         Close(connectionFd);
+//        printf("Closed finished: %d\n", connectionFd);
         pthread_mutex_lock(&queue_mutex);
         remove_by_fd(&running_queue, connectionFd);
         pthread_mutex_unlock(&queue_mutex);
@@ -237,14 +271,14 @@ void getargs(int *port, int* threadsNum, int* queueSize, int argc, char *argv[],
 {
     if (argc < 2)
     {
-	    fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-	    exit(1);
+        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
+        exit(1);
     }
     *port = atoi(argv[1]);
     *threadsNum = atoi(argv[2]);
     *queueSize = atoi(argv[3]);
     char *schedAlgStr = argv[4];
-    if(argc>5){
+    if(argc==6){
         *maxSize = atoi(argv[5]);
     }
     else{
@@ -278,23 +312,14 @@ int main(int argc, char *argv[]) {
 
     int threadsNum, queueSize, maxSize;
     getargs(&port, &threadsNum, &queueSize, argc, argv, &maxSize);
-
-    //
-    // HW3: Create some threads...
-    //
-
     pthread_cond_init(&thread_cond, NULL);
     pthread_cond_init(&wait_master_cond, NULL);
     setup_queue(&running_queue);
     setup_queue(&waiting_queue);
 
     pthread_mutex_init(&queue_mutex, NULL);
-//    pthread_mutex_init(&waiting_mutex, NULL);
-//    pthread_mutex_init(&running_mutex, NULL);
-  //  pthread_mutex_init(&master_mutex, NULL);
 
     stat_data *threadStats = (stat_data*) malloc(threadsNum * sizeof(stat_data));
-//    int *indexArr = (int *) malloc(threadsNum* sizeof(int));
     pthread_t *threadsPool = (pthread_t *) malloc(threadsNum * sizeof(pthread_t));
     for (int i = 0; i < threadsNum; ++i) {
 //        indexArr[i] = i;
@@ -313,9 +338,6 @@ int main(int argc, char *argv[]) {
 
         pthread_mutex_lock(&queue_mutex);
         if (running_queue.size + waiting_queue.size < queueSize) {
-//            pthread_mutex_unlock(&queue_mutex);
-
-//            pthread_mutex_lock(&queue_mutex);
 
             enqueue_rear_start(&waiting_queue, connfd, currTime);
 
@@ -323,16 +345,12 @@ int main(int argc, char *argv[]) {
                 pthread_cond_signal(&thread_cond);
             }
 
-//            printf("here waiting\n");
             pthread_mutex_unlock(&queue_mutex);
 
         } else {
             if (schedAlg == BLOCK) {
-//                printf("in block\n");
 
                 pthread_cond_wait(&wait_master_cond, &queue_mutex);
-
-
                 enqueue_rear_start(&waiting_queue, connfd, currTime);
 
                 if (running_queue.size < threadsNum) {
@@ -347,10 +365,19 @@ int main(int argc, char *argv[]) {
                 pthread_mutex_unlock(&queue_mutex);
 
             } else if (schedAlg == DROP_HEAD) {
+                if(waiting_queue.size == 0){
+                    close(connfd);
+//                    printf("Closed full: %d\n", connfd);
+                    pthread_mutex_unlock(&queue_mutex);
+                    continue;
+                }
                 int tempRes;
                 dequeue_front(&waiting_queue, &tempRes, NULL);
                 if(tempRes != -1)
+                {
                     Close(tempRes);
+//                    printf("Closed head: %d\n", tempRes);
+                }
 
                 enqueue_rear_start(&waiting_queue, connfd, currTime);
 
@@ -369,7 +396,7 @@ int main(int argc, char *argv[]) {
 //                if (running_queue.size < threadsNum) {
 //                    pthread_cond_signal(&thread_cond);
 //                }
-
+                pthread_cond_signal(&thread_cond);
                 pthread_mutex_unlock(&queue_mutex);
 
 
@@ -382,6 +409,11 @@ int main(int argc, char *argv[]) {
 
 
             } else if (schedAlg == DROP_RANDOM) {
+                if(waiting_queue.size == 0){
+                     close(connfd);
+                    pthread_mutex_unlock(&queue_mutex);
+                    continue;
+                }
                 int taskToDrop;
                 int dropSize = (waiting_queue.size + 1) / 2;
                 for (int i = 0; i < dropSize; i++) {
@@ -389,17 +421,10 @@ int main(int argc, char *argv[]) {
                     remove_by_index(&waiting_queue, taskToDrop);
                 }
                 enqueue_rear_start(&waiting_queue, connfd, currTime);
+                pthread_cond_signal(&thread_cond);
                 pthread_mutex_unlock(&queue_mutex);
             }
         }
-
-        //
-        // HW3: In general, don't handle the request in the main thread.
-        // Save the relevant info in a buffer and have one of the worker threads
-        // do the work.
-        //
-
-
     }
 
 }
