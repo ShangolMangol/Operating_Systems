@@ -71,43 +71,6 @@ public:
         
     }
 
-    // void deleteOrdered(MallocMetadata* newData){
-    //     MallocMetadata* current = head;
-    //     MallocMetadata* prev = nullptr;
-
-    //     while(current && current->address != newData->address){
-    //         prev = current;
-    //         current = current->next;
-    //     }
-
-    //     // new data wasn't found in the list
-    //     if(!current){
-    //         return;
-    //     }
-
-    //     // in case new data was found and it is the first element in the list
-    //     if(current == head){
-    //         if(head == tail){ // only one element in the list
-    //             tail = nullptr;
-    //             head = nullptr;
-    //         }
-    //         else{
-    //             head = head->next;
-    //             head->prev = nullptr;
-    //         }
-            
-    //     }
-    //     // in case new data was found and it is not the first element in the list
-    //     else{
-    //         if(tail == current){
-    //             tail=nullptr;
-    //         }
-    //         prev->next = current->next;
-    //         (current->next)->prev = prev;
-    //     }
-        
-    // }
-
     void* findFreeBySize(size_t size){
         MallocMetadata* current = head;
         while(current){
@@ -140,7 +103,7 @@ void* smalloc(size_t size)
     {
         return NULL;
     }
-    MallocMetadata* newMetaData = (MallocMetadata*) mallres;
+    MallocMetadata* newMetaData = (MallocMetadata*) res;
     res = (char *) res + sizeof(MallocMetadata);
     initMallocMetaData(newMetaData, size, false, nullptr, nullptr, res);   
     mallocDataList.insertOrdered(newMetaData);   

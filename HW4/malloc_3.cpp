@@ -1,5 +1,7 @@
 #include <unistd.h>
 #include <cstring>
+#include <stdlib.h>
+#include <sys/mman.h>
 
 #define MAX_ORDER 10
 #define SIZE_128K 128*1024
@@ -29,6 +31,14 @@ void initMallocMetaData(MallocMetadata* metadata, size_t size1, bool is_free1,
     metadata->is_mmap = false;
 }
 
+void checkBufferOverflow(MallocMetadata* metadata)
+{
+    if(metadata->cookie != globalCookie)
+    {
+        exit(0xdeadbeef);
+    }
+}
+
 class BlockList 
 {    
 public:
@@ -49,7 +59,7 @@ public:
         MallocMetadata* prevTemp = nullptr;
         while(temp != nullptr) 
         {
-            
+            checkBufferOverflow(temp);   
             if(newNode->address < temp->address) 
             {
                 break;
@@ -85,6 +95,7 @@ public:
         MallocMetadata* prev = nullptr;
 
         while(current && current->address != newData->address){
+            checkBufferOverflow(current);
             prev = current;
             current = current->next;
         }
@@ -121,6 +132,7 @@ public:
         MallocMetadata* current = head;
         while(current)
         {
+            checkBufferOverflow(current);
             if(current->size >= size && current->is_free)
             {
                 current->is_free = false;
@@ -131,9 +143,10 @@ public:
         return nullptr;
     }
 
-    void* findByAddress(size_t address){
+    void* findByAddress(void* address){
         MallocMetadata* current = head;
         while(current){
+            checkBufferOverflow(current);
             if(current->address == address)
             {
                 return current->address;
@@ -142,6 +155,71 @@ public:
         }
         return nullptr;
     }
+
+    size_t getFreeCount()
+    {
+        size_t cnt = 0;
+        MallocMetadata* current = head;
+        while(current)
+        {
+            checkBufferOverflow(current);
+            if(current->is_free)
+            {
+                cnt++;
+            }
+            current = current->next;
+        }
+        return cnt;
+    }
+
+    size_t getFreeBytesCount()
+    {
+        size_t cnt = 0;
+        MallocMetadata* current = head;
+        while(current)
+        {
+            checkBufferOverflow(current);
+            if(current->is_free)
+            {
+                cnt += current->size - sizeof(MallocMetadata);
+            }
+            current = current->next;
+        }
+        return cnt;
+    }
+
+    size_t getAllocatedBlocks()
+    {
+        size_t cnt = 0;
+        MallocMetadata* current = head;
+        while(current)
+        {
+            checkBufferOverflow(current);
+            cnt++;
+            current = current->next;
+        }
+        return cnt;
+    }
+
+    size_t getAllocatedBytesCount()
+    {
+        size_t cnt = 0;
+        MallocMetadata* current = head;
+        while(current)
+        {
+            checkBufferOverflow(current);
+            cnt += current->size - sizeof(MallocMetadata);
+            current = current->next;
+        }
+        return cnt;
+    }
+
+    
+
+
+
+
+
 };
 
 
@@ -162,7 +240,7 @@ public:
 // challenge 0
 BlockList listsArr[MAX_ORDER+1];
 bool firstMalloc = true;
-int sizeOfBlocks[MAX_ORDER+1] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384,
+size_t sizeOfBlocks[MAX_ORDER+1] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384,
                                32768, 65536, 131072};
 BlockList mmapList = BlockList();
 
@@ -198,7 +276,7 @@ void* findTightestBlock(size_t requestedSize){
                     listsArr[i-1].insertOrdered(firstNewBlock);
                     MallocMetadata* secondNewBlock = metaRes + sizeOfBlocks[i-1];
                     initMallocMetaData(secondNewBlock, sizeOfBlocks[i-1], true, nullptr, nullptr,
-                             res + sizeOfBlocks[i-1]);
+                             (char*) res + sizeOfBlocks[i-1]);
                     listsArr[i-1].insertOrdered(secondNewBlock);
                 }
                 metaRes->is_free = false;
@@ -212,8 +290,12 @@ void* findTightestBlock(size_t requestedSize){
 
 
 void* findBuddyAddress(MallocMetadata* metaData){
-    return ((size_t) metaData) ^ metaData->size;
+    checkBufferOverflow(metaData);
+    unsigned long long ptrValue = reinterpret_cast<unsigned long long>(metaData);
+    return reinterpret_cast<void*>(ptrValue ^ metaData->size);
 }
+
+
 
 
 void* smalloc(size_t size)
@@ -226,10 +308,10 @@ void* smalloc(size_t size)
     if(firstMalloc)
     {
         firstMalloc = false;
-        void* prevRes = sbrk(NULL);
+        void* prevRes = sbrk(0);
         //align to 128K
-        void * res = sbrk(32 * SIZE_128K - (prevRes%SIZE_128K) + SIZE_128K);
-        res = res + SIZE_128K - (prevRes%SIZE_128K);
+        void * res = sbrk(32 * SIZE_128K - ((unsigned long long)prevRes%SIZE_128K) + SIZE_128K);
+        res = (char*) res + SIZE_128K - ((unsigned long long)prevRes%SIZE_128K);
         for(int i=0; i<MAX_ORDER+1; i++)
         {
             listsArr[i] = BlockList();
@@ -259,7 +341,7 @@ void* smalloc(size_t size)
     mmapMetaData->is_mmap = true;
     res = (char *) res + sizeof(MallocMetadata);
     initMallocMetaData(mmapMetaData, size + sizeof(MallocMetadata), false
-                        , nullptr, nullptr, res + sizeof(MallocMetadata));   
+                        , nullptr, nullptr, (char*) res + sizeof(MallocMetadata));   
     mmapList.insertOrdered(mmapMetaData);
     return mmapMetaData->address;
 }
@@ -283,6 +365,7 @@ void sfree(void* p){
     }
 
     MallocMetadata* current = (MallocMetadata*) p - sizeof(MallocMetadata);
+    checkBufferOverflow(current);
     if(current->is_mmap){
         munmap(current, current->size + sizeof(MallocMetadata));
         mmapList.deleteOrdered(current);
@@ -291,6 +374,7 @@ void sfree(void* p){
 
     current->is_free = true;
     MallocMetadata* buddy = (MallocMetadata*) findBuddyAddress(current);
+    checkBufferOverflow(buddy);
     if(!buddy->is_free || current->size == SIZE_128K)
     {
         return;
@@ -298,11 +382,12 @@ void sfree(void* p){
     while(buddy->is_free && buddy->size < sizeOfBlocks[MAX_ORDER])
     {
         int i = findListIndex(current->size);
-        listArr[i].deleteOrdered(current);
-        listArr[i].deleteOrdered(buddy);
+        listsArr[i].deleteOrdered(current);
+        listsArr[i].deleteOrdered(buddy);
         current->size *= 2;
         listsArr[i+1].insertOrdered(current);  
         buddy = (MallocMetadata*) findBuddyAddress(current);
+        checkBufferOverflow(buddy);
     }
 }
 
@@ -316,23 +401,24 @@ void* srealloc(void* oldp, size_t size){
         return smalloc(size);
     }
 
-
+    
     MallocMetadata* current = (MallocMetadata*) oldp - sizeof(MallocMetadata);
-
+    checkBufferOverflow(current);
     if(current->size == size+sizeof(MallocMetadata) || 
                 (current->size >= size+sizeof(MallocMetadata) && !current->is_mmap)){
         return oldp;
     }
 
     void* newBlock;
-    void* buddy = (MallocMetadata*) findBuddyAddress(current);
+    MallocMetadata* buddy = (MallocMetadata*) findBuddyAddress(current);
     if(buddy->is_free)
     {
+        checkBufferOverflow(buddy);
         while(buddy->is_free && buddy->size < sizeOfBlocks[MAX_ORDER])
         {
             int i = findListIndex(current->size);
-            listArr[i].deleteOrdered(current);
-            listArr[i].deleteOrdered(buddy);
+            listsArr[i].deleteOrdered(current);
+            listsArr[i].deleteOrdered(buddy);
             current->size *= 2;
             listsArr[i+1].insertOrdered(current);
             buddy = (MallocMetadata*) findBuddyAddress(current);
@@ -360,49 +446,46 @@ void* srealloc(void* oldp, size_t size){
     return newBlock;   
 }
 
+
 size_t _num_free_blocks(){
-    size_t count = 0;
-    struct MallocMetadata* current = mallocDataList.head;
-    while(current){
-        if(current->is_free){
-            count++;
-        }
-        current = current->next;
-    } 
-    return count;
+    int blockCnt = 0;
+    for(int i = 0; i < MAX_ORDER+1; i++)
+    {
+        blockCnt += listsArr[i].getFreeCount();
+    }
+    return blockCnt;
 }
 
 size_t _num_free_bytes(){
     size_t totalSize = 0;
-    struct MallocMetadata* current = mallocDataList.head;
-    while(current){
-        if(current->is_free){
-            totalSize += current->size;            
-        }
-        current = current->next;
-    } 
+    for(int i = 0; i < MAX_ORDER+1; i++)
+    {
+        totalSize += listsArr[i].getFreeBytesCount();
+    }
     return totalSize;
 }
 
 size_t _num_allocated_blocks(){
-    size_t count = 0;
-    struct MallocMetadata* current = mallocDataList.head;
-    while(current){
-        count++;
-        current = current->next;
+    int blockCnt = 0;
+    for(int i = 0; i < MAX_ORDER+1; i++)
+    {
+        blockCnt += listsArr[i].getAllocatedBlocks();
     }
-    return count;
+
+    blockCnt += mmapList.getAllocatedBlocks();
+    return blockCnt;
 }
 
 
 size_t _num_allocated_bytes(){
-    size_t count = 0;
-    struct MallocMetadata* current = mallocDataList.head;
-    while(current){
-        count += current->size;
-        current = current->next;
+    int bytesCnt = 0;
+    for(int i = 0; i < MAX_ORDER+1; i++)
+    {
+        bytesCnt += listsArr[i].getAllocatedBytesCount();
     }
-    return count;
+
+    bytesCnt += mmapList.getAllocatedBytesCount();
+    return bytesCnt;
 }
 
  size_t _num_meta_data_bytes(){
