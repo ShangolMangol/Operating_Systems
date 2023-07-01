@@ -128,19 +128,13 @@ void sfree(void* p){
     if(p == NULL){
         return;
     }
-    MallocMetadata *current = mallocDataList.head;
-    while(current && current->address != p){
-        current = current->next;
-    }
-    if(!current){
-        return;
-    }
-    current->is_free = true;         
+    MallocMetadata *current = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(p) - sizeof(MallocMetadata));
+    current->is_free = true;
 }
 
 
 void* srealloc(void* oldp, size_t size){
-    if(size == 0){
+    if(size == 0 || size>100000000){
         return NULL;
     }
     
@@ -148,16 +142,16 @@ void* srealloc(void* oldp, size_t size){
         return smalloc(size);
     }
 
-    MallocMetadata* current = (MallocMetadata*) oldp - sizeof(MallocMetadata);
+    MallocMetadata *current = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(oldp) - sizeof(MallocMetadata));
     if(current->size >= size){
         return oldp;
     }
-    current->is_free = true;
+    
     void* newBlock = smalloc(size);
     if(newBlock == NULL){
-        current->is_free = false;
         return NULL;
     }
+    current->is_free = true;
     std::memmove(newBlock, oldp, current->size);  
     return newBlock;   
 }

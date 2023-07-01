@@ -2,9 +2,11 @@
 #include <cstring>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <cstdlib>
+#include <ctime>
 
 #define MAX_ORDER 10
-#define SIZE_128K 128*1024
+#define SIZE_128K 131072
 
 typedef struct MallocMetadata {
     int cookie; 
@@ -17,6 +19,7 @@ typedef struct MallocMetadata {
     bool is_mmap;
 } MallocMetadata;
 
+// srand(time(0));
 int globalCookie = rand();
 
 void initMallocMetaData(MallocMetadata* metadata, size_t size1, bool is_free1,
@@ -120,10 +123,13 @@ public:
         // in case new data was found and it is not the first element in the list
         else{
             if(tail == current){
-                tail=nullptr;
+                tail=prev;
+                prev->next= nullptr;
             }
-            prev->next = current->next;
-            (current->next)->prev = prev;
+            else{
+                prev->next = current->next;
+                (current->next)->prev = prev;
+            }
         }
         
     }
@@ -213,13 +219,6 @@ public:
         }
         return cnt;
     }
-
-    
-
-
-
-
-
 };
 
 
@@ -256,6 +255,27 @@ int findListIndex(size_t size)
     return -1;
 }
 
+void blockPartition(MallocMetadata* metaRes, int index, int partitionNumber)
+{
+    if(partitionNumber == 0)
+    {
+        return;
+    }
+    listsArr[index].deleteOrdered(metaRes);
+    while(partitionNumber > 0)
+    {
+        MallocMetadata* newBlock = (MallocMetadata*) (((char*)metaRes) + sizeOfBlocks[index-1]);
+        initMallocMetaData(newBlock, sizeOfBlocks[index-1], true, nullptr, nullptr,
+                reinterpret_cast<void*>(reinterpret_cast<char*>(metaRes) + sizeOfBlocks[index-1] + sizeof(MallocMetadata)));
+        listsArr[index-1].insertOrdered(newBlock);
+        partitionNumber--;
+        index--;
+    }
+    MallocMetadata* firstNewBlock = metaRes;
+    initMallocMetaData(firstNewBlock, sizeOfBlocks[index], false, nullptr, nullptr, metaRes->address);
+    listsArr[index].insertOrdered(firstNewBlock);
+}
+
 void* findTightestBlock(size_t requestedSize){
     void* res;
     int cntFit = 0;
@@ -267,20 +287,10 @@ void* findTightestBlock(size_t requestedSize){
             
             if(res != nullptr)
             {
-                MallocMetadata* metaRes = (MallocMetadata*) res - sizeof(MallocMetadata);
-                if(cntFit>0) // i is not 0 because cntFit is 0 only when i is 0
-                {
-                    listsArr[i].deleteOrdered(metaRes);
-                    MallocMetadata* firstNewBlock = metaRes;
-                    initMallocMetaData(firstNewBlock, sizeOfBlocks[i-1], false, nullptr, nullptr, res);
-                    listsArr[i-1].insertOrdered(firstNewBlock);
-                    MallocMetadata* secondNewBlock = metaRes + sizeOfBlocks[i-1];
-                    initMallocMetaData(secondNewBlock, sizeOfBlocks[i-1], true, nullptr, nullptr,
-                             (char*) res + sizeOfBlocks[i-1]);
-                    listsArr[i-1].insertOrdered(secondNewBlock);
-                }
+                MallocMetadata *metaRes = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) - sizeof(MallocMetadata));
+                blockPartition(metaRes, i, cntFit);
                 metaRes->is_free = false;
-                return metaRes + sizeof(MallocMetadata); 
+                return reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(metaRes) + sizeof(MallocMetadata));
             }
             cntFit++;
         }
@@ -296,8 +306,6 @@ void* findBuddyAddress(MallocMetadata* metaData){
 }
 
 
-
-
 void* smalloc(size_t size)
 {
     if(size == 0 || size > 100000000)
@@ -311,18 +319,20 @@ void* smalloc(size_t size)
         void* prevRes = sbrk(0);
         //align to 128K
         void * res = sbrk(32 * SIZE_128K - ((unsigned long long)prevRes%SIZE_128K) + SIZE_128K);
-        res = (char*) res + SIZE_128K - ((unsigned long long)prevRes%SIZE_128K);
+        //res = (char*) res + SIZE_128K - ((unsigned long long)prevRes%SIZE_128K);
+        res = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) +  SIZE_128K - ((unsigned long long)prevRes%SIZE_128K));
+   
         for(int i=0; i<MAX_ORDER+1; i++)
         {
             listsArr[i] = BlockList();
         }
-        for(int i = 0; i < 31; i++)
+        for(int i = 0; i <= 31; i++)
         {
-            MallocMetadata* newMetaData = (MallocMetadata*) prevRes;
+            MallocMetadata* newMetaData = (MallocMetadata*) res;
             initMallocMetaData(newMetaData, SIZE_128K, true, nullptr, nullptr,
-                     (char *) prevRes + sizeof(MallocMetadata));
+                     reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) + sizeof(MallocMetadata)));
             listsArr[MAX_ORDER].insertOrdered(newMetaData);
-            prevRes = (char *) prevRes + SIZE_128K;
+            res = (char *) res + SIZE_128K;
         }
     }
 
@@ -333,15 +343,16 @@ void* smalloc(size_t size)
         {
             return tightestBlock;
         }
+        return NULL;
     }
 
     //mmap case
     void* res = mmap(NULL, size + sizeof(MallocMetadata), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
     MallocMetadata* mmapMetaData = (MallocMetadata*)res;
     mmapMetaData->is_mmap = true;
-    res = (char *) res + sizeof(MallocMetadata);
+    res = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) + sizeof(MallocMetadata));
     initMallocMetaData(mmapMetaData, size + sizeof(MallocMetadata), false
-                        , nullptr, nullptr, (char*) res + sizeof(MallocMetadata));   
+                        , nullptr, nullptr, reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) + size));   
     mmapList.insertOrdered(mmapMetaData);
     return mmapMetaData->address;
 }
@@ -363,9 +374,11 @@ void sfree(void* p){
     if(p == NULL){
         return;
     }
-
-    MallocMetadata* current = (MallocMetadata*) p - sizeof(MallocMetadata);
+    MallocMetadata *current = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(p) - sizeof(MallocMetadata));
     checkBufferOverflow(current);
+    if(current->is_free){
+        return;
+    }
     if(current->is_mmap){
         munmap(current, current->size + sizeof(MallocMetadata));
         mmapList.deleteOrdered(current);
@@ -373,21 +386,29 @@ void sfree(void* p){
     }
 
     current->is_free = true;
+    if(current->size == SIZE_128K){
+        return;
+    }
     MallocMetadata* buddy = (MallocMetadata*) findBuddyAddress(current);
     checkBufferOverflow(buddy);
-    if(!buddy->is_free || current->size == SIZE_128K)
+    if(!buddy->is_free)
     {
         return;
     }
     while(buddy->is_free && buddy->size < sizeOfBlocks[MAX_ORDER])
     {
+        checkBufferOverflow(buddy);
         int i = findListIndex(current->size);
         listsArr[i].deleteOrdered(current);
         listsArr[i].deleteOrdered(buddy);
         current->size *= 2;
         listsArr[i+1].insertOrdered(current);  
+        if(current->size == SIZE_128K)
+        {
+            break;
+        }
         buddy = (MallocMetadata*) findBuddyAddress(current);
-        checkBufferOverflow(buddy);
+        
     }
 }
 
@@ -401,8 +422,7 @@ void* srealloc(void* oldp, size_t size){
         return smalloc(size);
     }
 
-    
-    MallocMetadata* current = (MallocMetadata*) oldp - sizeof(MallocMetadata);
+    MallocMetadata *current = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(oldp) - sizeof(MallocMetadata));
     checkBufferOverflow(current);
     if(current->size == size+sizeof(MallocMetadata) || 
                 (current->size >= size+sizeof(MallocMetadata) && !current->is_mmap)){
@@ -442,6 +462,7 @@ void* srealloc(void* oldp, size_t size){
     if(current->is_mmap)
     {
         munmap(current, current->size + sizeof(MallocMetadata));
+        mmapList.deleteOrdered(current);
     }
     return newBlock;   
 }
