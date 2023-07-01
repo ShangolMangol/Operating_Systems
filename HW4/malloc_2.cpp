@@ -3,11 +3,11 @@
 
 
 typedef struct MallocMetadata {
-    size_t size;
+    size_t size; //excluding the metadata
     bool is_free;
     MallocMetadata* next;
     MallocMetadata* prev;
-    void* address;
+    void* address; // the address of the data
 } MallocMetadata;
 
 void initMallocMetaData(MallocMetadata* metadata, size_t size1, bool is_free1,
@@ -71,42 +71,42 @@ public:
         
     }
 
-    void deleteOrdered(MallocMetadata* newData){
-        MallocMetadata* current = head;
-        MallocMetadata* prev = nullptr;
+    // void deleteOrdered(MallocMetadata* newData){
+    //     MallocMetadata* current = head;
+    //     MallocMetadata* prev = nullptr;
 
-        while(current && current->address != newData->address){
-            prev = current;
-            current = current->next;
-        }
+    //     while(current && current->address != newData->address){
+    //         prev = current;
+    //         current = current->next;
+    //     }
 
-        // new data wasn't found in the list
-        if(!current){
-            return;
-        }
+    //     // new data wasn't found in the list
+    //     if(!current){
+    //         return;
+    //     }
 
-        // in case new data was found and it is the first element in the list
-        if(current == head){
-            if(head == tail){ // only one element in the list
-                tail = nullptr;
-                head = nullptr;
-            }
-            else{
-                head = head->next;
-                head->prev = nullptr;
-            }
+    //     // in case new data was found and it is the first element in the list
+    //     if(current == head){
+    //         if(head == tail){ // only one element in the list
+    //             tail = nullptr;
+    //             head = nullptr;
+    //         }
+    //         else{
+    //             head = head->next;
+    //             head->prev = nullptr;
+    //         }
             
-        }
-        // in case new data was found and it is not the first element in the list
-        else{
-            if(tail == current){
-                tail=nullptr;
-            }
-            prev->next = current->next;
-            (current->next)->prev = prev;
-        }
+    //     }
+    //     // in case new data was found and it is not the first element in the list
+    //     else{
+    //         if(tail == current){
+    //             tail=nullptr;
+    //         }
+    //         prev->next = current->next;
+    //         (current->next)->prev = prev;
+    //     }
         
-    }
+    // }
 
     void* findFreeBySize(size_t size){
         MallocMetadata* current = head;
@@ -134,17 +134,17 @@ void* smalloc(size_t size)
     if(res != nullptr){
         return res;
     }
+
     res = sbrk(size+ sizeof(MallocMetadata));
     if(res == (void*)(-1))
     {
         return NULL;
     }
-    MallocMetadata* newMetaData = (MallocMetadata*) res;
-    res = (void *) res + sizeof(MallocMetadata);
-
+    MallocMetadata* newMetaData = (MallocMetadata*) mallres;
+    res = (char *) res + sizeof(MallocMetadata);
     initMallocMetaData(newMetaData, size, false, nullptr, nullptr, res);   
     mallocDataList.insertOrdered(newMetaData);   
-    return newMetaData;
+    return newMetaData->address;
 }
 
 void* scalloc(size_t num, size_t size){
@@ -155,8 +155,8 @@ void* scalloc(size_t num, size_t size){
     void* blockPointer = smalloc(num*size);
     if(blockPointer == NULL){
         return NULL;
-    }     
-    std::memset(blockPointer, 0, num*size);      
+    }
+    std::memset(blockPointer, 0, num*size);
     return blockPointer;
 }
 
@@ -165,7 +165,6 @@ void sfree(void* p){
     if(p == NULL){
         return;
     }
-    MallocMetadata *toFree = nullptr;
     MallocMetadata *current = mallocDataList.head;
     while(current && current->address != p){
         current = current->next;
@@ -245,7 +244,7 @@ size_t _num_allocated_bytes(){
     return count;
 }
 
-size_t _num_meta_data_bytes(){
+ size_t _num_meta_data_bytes(){
     return _num_allocated_blocks() * sizeof(MallocMetadata);
     
  }

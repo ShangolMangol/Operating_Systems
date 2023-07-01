@@ -11,14 +11,16 @@ typedef struct MallocMetadata {
     MallocMetadata* next;
     MallocMetadata* prev;
     void* address; //address is the address of the data
-    MallocMetadata* buddy;
+    // MallocMetadata* buddy;
     bool is_mmap;
 } MallocMetadata;
+
+int globalCookie = rand();
 
 void initMallocMetaData(MallocMetadata* metadata, size_t size1, bool is_free1,
              MallocMetadata* next1, MallocMetadata* prev1, void* address1)
 {
-    metadata->cookie = rand();
+    metadata->cookie = globalCookie;
     metadata->size = size1;
     metadata->is_free = is_free1;
     metadata->next = next1;
@@ -47,7 +49,7 @@ public:
         MallocMetadata* prevTemp = nullptr;
         while(temp != nullptr) 
         {
-            //
+            
             if(newNode->address < temp->address) 
             {
                 break;
@@ -77,7 +79,7 @@ public:
         }
         
     }
-
+    
     void deleteOrdered(MallocMetadata* newData){
         MallocMetadata* current = head;
         MallocMetadata* prev = nullptr;
@@ -117,10 +119,23 @@ public:
 
     void* findFreeBySize(size_t size){
         MallocMetadata* current = head;
-        while(current){
+        while(current)
+        {
             if(current->size >= size && current->is_free)
             {
                 current->is_free = false;
+                return current->address;
+            }
+            current = current->next;
+        }
+        return nullptr;
+    }
+
+    void* findByAddress(size_t address){
+        MallocMetadata* current = head;
+        while(current){
+            if(current->address == address)
+            {
                 return current->address;
             }
             current = current->next;
@@ -147,8 +162,21 @@ public:
 // challenge 0
 BlockList listsArr[MAX_ORDER+1];
 bool firstMalloc = true;
-int sizeOfBlocks[MAX_ORDER] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384,
+int sizeOfBlocks[MAX_ORDER+1] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384,
                                32768, 65536, 131072};
+BlockList mmapList = BlockList();
+
+int findListIndex(size_t size)
+{
+    for(int i = 0; i <= MAX_ORDER; i++)
+    {
+        if(sizeOfBlocks[i] == size)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
 
 void* findTightestBlock(size_t requestedSize){
     void* res;
@@ -169,10 +197,11 @@ void* findTightestBlock(size_t requestedSize){
                     initMallocMetaData(firstNewBlock, sizeOfBlocks[i-1], false, nullptr, nullptr, res);
                     listsArr[i-1].insertOrdered(firstNewBlock);
                     MallocMetadata* secondNewBlock = metaRes + sizeOfBlocks[i-1];
-                    initMallocMetaData(secondNewBlock, sizeOfBlocks[i-1], true, nullptr, nullptr, secondNewBlock);
-                    firstNewBlock->buddy = secondNewBlock;
-                    secondNewBlock->buddy = firstNewBlock;
+                    initMallocMetaData(secondNewBlock, sizeOfBlocks[i-1], true, nullptr, nullptr,
+                             res + sizeOfBlocks[i-1]);
+                    listsArr[i-1].insertOrdered(secondNewBlock);
                 }
+                metaRes->is_free = false;
                 return metaRes + sizeof(MallocMetadata); 
             }
             cntFit++;
@@ -180,6 +209,12 @@ void* findTightestBlock(size_t requestedSize){
     }
     return nullptr;
 }
+
+
+void* findBuddyAddress(MallocMetadata* metaData){
+    return ((size_t) metaData) ^ metaData->size;
+}
+
 
 void* smalloc(size_t size)
 {
@@ -192,8 +227,11 @@ void* smalloc(size_t size)
     {
         firstMalloc = false;
         void* prevRes = sbrk(NULL);
-        void * res = sbrk(32 * SIZE_128K); 
-        for(int i=0; i<MAX_ORDER+1; i++){
+        //align to 128K
+        void * res = sbrk(32 * SIZE_128K - (prevRes%SIZE_128K) + SIZE_128K);
+        res = res + SIZE_128K - (prevRes%SIZE_128K);
+        for(int i=0; i<MAX_ORDER+1; i++)
+        {
             listsArr[i] = BlockList();
         }
         for(int i = 0; i < 31; i++)
@@ -206,13 +244,24 @@ void* smalloc(size_t size)
         }
     }
 
-    void* tightestBlock = findTightestBlock(size + sizeof(MallocMetadata));
-    if(tightestBlock != nullptr)
+    if(size <= SIZE_128K)
     {
-        return tightestBlock;
+        void* tightestBlock = findTightestBlock(size + sizeof(MallocMetadata));
+        if(tightestBlock != nullptr)
+        {
+            return tightestBlock;
+        }
     }
-    return NULL; //should never get here
-    //kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+
+    //mmap case
+    void* res = mmap(NULL, size + sizeof(MallocMetadata), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    MallocMetadata* mmapMetaData = (MallocMetadata*)res;
+    mmapMetaData->is_mmap = true;
+    res = (char *) res + sizeof(MallocMetadata);
+    initMallocMetaData(mmapMetaData, size + sizeof(MallocMetadata), false
+                        , nullptr, nullptr, res + sizeof(MallocMetadata));   
+    mmapList.insertOrdered(mmapMetaData);
+    return mmapMetaData->address;
 }
 
 void* scalloc(size_t num, size_t size){
@@ -228,19 +277,33 @@ void* scalloc(size_t num, size_t size){
     return blockPointer;
 }
 
-
 void sfree(void* p){
     if(p == NULL){
         return;
     }
-    MallocMetadata *current = mallocDataList.head;
-    while(current && current->address != p){
-        current = current->next;
-    }
-    if(!current){
+
+    MallocMetadata* current = (MallocMetadata*) p - sizeof(MallocMetadata);
+    if(current->is_mmap){
+        munmap(current, current->size + sizeof(MallocMetadata));
+        mmapList.deleteOrdered(current);
         return;
     }
-    current->is_free = true;         
+
+    current->is_free = true;
+    MallocMetadata* buddy = (MallocMetadata*) findBuddyAddress(current);
+    if(!buddy->is_free || current->size == SIZE_128K)
+    {
+        return;
+    }
+    while(buddy->is_free && buddy->size < sizeOfBlocks[MAX_ORDER])
+    {
+        int i = findListIndex(current->size);
+        listArr[i].deleteOrdered(current);
+        listArr[i].deleteOrdered(buddy);
+        current->size *= 2;
+        listsArr[i+1].insertOrdered(current);  
+        buddy = (MallocMetadata*) findBuddyAddress(current);
+    }
 }
 
 
@@ -253,17 +316,47 @@ void* srealloc(void* oldp, size_t size){
         return smalloc(size);
     }
 
+
     MallocMetadata* current = (MallocMetadata*) oldp - sizeof(MallocMetadata);
-    if(current->size >= size){
+
+    if(current->size == size+sizeof(MallocMetadata) || 
+                (current->size >= size+sizeof(MallocMetadata) && !current->is_mmap)){
         return oldp;
     }
-    current->is_free = true;
-    void* newBlock = smalloc(size);
-    if(newBlock == NULL){
-        current->is_free = false;
-        return NULL;
+
+    void* newBlock;
+    void* buddy = (MallocMetadata*) findBuddyAddress(current);
+    if(buddy->is_free)
+    {
+        while(buddy->is_free && buddy->size < sizeOfBlocks[MAX_ORDER])
+        {
+            int i = findListIndex(current->size);
+            listArr[i].deleteOrdered(current);
+            listArr[i].deleteOrdered(buddy);
+            current->size *= 2;
+            listsArr[i+1].insertOrdered(current);
+            buddy = (MallocMetadata*) findBuddyAddress(current);
+
+            if(current->size>= size + sizeof(MallocMetadata)){
+                newBlock = current->address;
+                break;
+            }
+        }
     }
-    std::memmove(newBlock, oldp, current->size);  
+    else
+    {
+        current->is_free = true;
+        newBlock = smalloc(size);
+        if(newBlock == NULL){
+            current->is_free = false;
+            return NULL;
+        }
+    }
+    std::memmove(newBlock, oldp, current->size);
+    if(current->is_mmap)
+    {
+        munmap(current, current->size + sizeof(MallocMetadata));
+    }
     return newBlock;   
 }
 
