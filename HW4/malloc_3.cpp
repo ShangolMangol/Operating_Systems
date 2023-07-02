@@ -22,8 +22,7 @@ typedef struct MallocMetadata {
     bool is_mmap;
 } MallocMetadata;
 
-// srand(time(0));
-int globalCookie = rand();
+int globalCookie;
 
 void initMallocMetaData(MallocMetadata* metadata, size_t size1, bool is_free1,
              MallocMetadata* next1, MallocMetadata* prev1, void* address1)
@@ -100,7 +99,7 @@ public:
         MallocMetadata* current = head;
         MallocMetadata* prev = nullptr;
 
-        while(current && current->address != newData->address){
+        while(current != nullptr && current->address != newData->address){
             checkBufferOverflow(current);
             prev = current;
             current = current->next;
@@ -157,7 +156,7 @@ public:
 
     void* findByAddress(void* address){
         MallocMetadata* current = head;
-        while(current){
+        while(current != nullptr){
             checkBufferOverflow(current);
             if(current->address == address)
             {
@@ -172,7 +171,7 @@ public:
     {
         size_t cnt = 0;
         MallocMetadata* current = head;
-        while(current)
+        while(current != nullptr)
         {
             checkBufferOverflow(current);
             if(current->is_free)
@@ -188,7 +187,7 @@ public:
     {
         size_t cnt = 0;
         MallocMetadata* current = head;
-        while(current)
+        while(current != nullptr)
         {
             checkBufferOverflow(current);
             if(current->is_free)
@@ -204,7 +203,7 @@ public:
     {
         size_t cnt = 0;
         MallocMetadata* current = head;
-        while(current)
+        while(current != nullptr)
         {
             checkBufferOverflow(current);
             cnt++;
@@ -217,7 +216,7 @@ public:
     {
         size_t cnt = 0;
         MallocMetadata* current = head;
-        while(current)
+        while(current != nullptr)
         {
             checkBufferOverflow(current);
             cnt += current->size - sizeof(MallocMetadata);
@@ -229,7 +228,7 @@ public:
     bool isInList(MallocMetadata* current)
     {
         MallocMetadata* temp = head;
-        while(temp)
+        while(temp != nullptr)
         {
             checkBufferOverflow(temp);
             if(temp == current)
@@ -262,7 +261,7 @@ BlockList listsArr[MAX_ORDER+1];
 bool firstMalloc = true;
 size_t sizeOfBlocks[MAX_ORDER+1] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384,
                                32768, 65536, 131072};
-BlockList mmapList = BlockList();
+BlockList mmapList;
 
 int findListIndex(size_t size)
 {
@@ -333,6 +332,9 @@ void* smalloc(size_t size)
 
     if(firstMalloc)
     {
+        srand(time(NULL));
+        globalCookie = rand();
+
         firstMalloc = false;
         void* prevRes = sbrk(0);
         //align to 128K
@@ -352,6 +354,8 @@ void* smalloc(size_t size)
             listsArr[MAX_ORDER].insertOrdered(newMetaData);
             res = (char *) res + SIZE_128K;
         }
+
+        mmapList = BlockList();
     }
 
     if(size == 0 || size > 100000000)
@@ -359,7 +363,9 @@ void* smalloc(size_t size)
         return NULL;
     }
 
-    if(size <= SIZE_128K)
+
+
+    if(size +sizeof(MallocMetadata) <= SIZE_128K)
     {
         void* tightestBlock = findTightestBlock(size + sizeof(MallocMetadata));
         if(tightestBlock != nullptr)
@@ -374,10 +380,13 @@ void* smalloc(size_t size)
     MallocMetadata* mmapMetaData = (MallocMetadata*)res;
     res = reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) + sizeof(MallocMetadata));
     initMallocMetaData(mmapMetaData, size + sizeof(MallocMetadata), false
-                        , nullptr, nullptr, reinterpret_cast<MallocMetadata*>(reinterpret_cast<char*>(res) + sizeof(MallocMetadata)));  
+                        , nullptr, nullptr, res);  
     mmapMetaData->is_mmap = true; 
+    mmapMetaData->cookie = globalCookie;
     mmapList.insertOrdered(mmapMetaData);
     return mmapMetaData->address;
+
+    
 }
 
 void* scalloc(size_t num, size_t size){
@@ -402,10 +411,10 @@ void sfree(void* p){
     if(current->is_free){
         return;
     }
-    if(current->is_mmap)
+    if(current->size > SIZE_128K || current->is_mmap)
     {
-        munmap(current, current->size);
         mmapList.deleteOrdered(current);
+        munmap(current, current->size);
         return;
     }
 
@@ -420,18 +429,13 @@ void sfree(void* p){
     {
         return;
     }
-    // printf("current address: %p\n", current->address);
-    // printf("buddy address: %p\n", buddy->address);
-    // printf("current size: %ld\n", current->size);
-    // printf("buddy size: %ld\n", buddy->size);
+
     while(buddy->is_free && current->size < sizeOfBlocks[MAX_ORDER])
     {
         checkBufferOverflow(buddy);
         int i = findListIndex(current->size);
         listsArr[i].deleteOrdered(current);
-        // printf("is Current in list: %d\n", listsArr[i].isInList(current));
         listsArr[i].deleteOrdered(buddy);
-        // printf("is Buddy in list: %d\n", listsArr[i].isInList(buddy));
 
         if(buddy->address < current->address)
         {
@@ -441,13 +445,7 @@ void sfree(void* p){
         current->size = current->size * 2;
         current->is_free = true;
         listsArr[i+1].insertOrdered(current);  
-        // printf("current address: %p\n", current->address);
-        // printf("inserted at list %d\n", i+1);        
-        // printf("is new Current in list: %d\n", listsArr[i+1].isInList(current));
-        // printf("inner num allocated blocks: %ld\n", _num_allocated_blocks());
-        // printf("inner num allocated blocks for %d: %ld\n", i, listsArr[i].getAllocatedBlocks());
-        // printf("inner num allocated blocks for %d: %ld\n", i+1, listsArr[i+1].getAllocatedBlocks());
-
+        
         if(current->size == SIZE_128K)
         {
             break;
